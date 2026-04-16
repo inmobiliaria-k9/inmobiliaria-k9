@@ -1,5 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { db } from "./firebase";
+import {
+  collection, doc, getDocs, setDoc, updateDoc, addDoc, onSnapshot
+} from "firebase/firestore";
 
+// ─── NAVEGACIÓN ───────────────────────────────────────────────────────────────
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: "▦" },
   { id: "naves", label: "Inmuebles y Naves", icon: "🏭" },
@@ -14,18 +19,18 @@ const inmuebles = [
 ];
 
 const navesIniciales = [
-  { id: 1, inmueble_id: 1, nombre: "NAVE 1", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
-  { id: 2, inmueble_id: 1, nombre: "NAVE 2", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
-  { id: 3, inmueble_id: 1, nombre: "NAVE 3", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
-  { id: 4, inmueble_id: 1, nombre: "NAVE 4", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
-  { id: 5, inmueble_id: 1, nombre: "NAVE 5", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
-  { id: 6, inmueble_id: 3, nombre: "NAVE 1", m2: 948,  renta: 0, inquilino: "", mantenimiento: false },
-  { id: 7, inmueble_id: 3, nombre: "NAVE 2", m2: 1054, renta: 0, inquilino: "", mantenimiento: false },
-  { id: 8, inmueble_id: 4, nombre: "15 DE MAYO", m2: 4479, renta: 0, inquilino: "", mantenimiento: false },
-  { id: 9, inmueble_id: 2, nombre: "JAGÜEY", m2: 4479, renta: 0, inquilino: "", mantenimiento: false },
+  { id: "nave1", inmueble_id: 1, nombre: "NAVE 1", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
+  { id: "nave2", inmueble_id: 1, nombre: "NAVE 2", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
+  { id: "nave3", inmueble_id: 1, nombre: "NAVE 3", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
+  { id: "nave4", inmueble_id: 1, nombre: "NAVE 4", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
+  { id: "nave5", inmueble_id: 1, nombre: "NAVE 5", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
+  { id: "nave6", inmueble_id: 3, nombre: "NAVE 1", m2: 948,  renta: 0, inquilino: "", mantenimiento: false },
+  { id: "nave7", inmueble_id: 3, nombre: "NAVE 2", m2: 1054, renta: 0, inquilino: "", mantenimiento: false },
+  { id: "nave8", inmueble_id: 4, nombre: "15 DE MAYO", m2: 4479, renta: 0, inquilino: "", mantenimiento: false },
+  { id: "nave9", inmueble_id: 2, nombre: "JAGÜEY", m2: 4479, renta: 0, inquilino: "", mantenimiento: false },
 ];
 
-const mesesSistema = ["Enero 2026", "Febrero 2026", "Marzo 2026", "Abril 2026"];
+const mesesSistema = ["Enero 2026", "Febrero 2026", "Marzo 2026", "Abril 2026", "Mayo 2026", "Junio 2026", "Julio 2026", "Agosto 2026", "Septiembre 2026", "Octubre 2026", "Noviembre 2026", "Diciembre 2026"];
 
 function calcularEstado(nave) {
   if (nave.mantenimiento) return "mantenimiento";
@@ -62,6 +67,7 @@ function Badge({ estado, tipo = "estado" }) {
   );
 }
 
+// ─── MODAL REGISTRAR PAGO ─────────────────────────────────────────────────────
 function RegistrarPagoModal({ inquilino, mes, monto, onClose, onSave }) {
   const hoy = new Date().toISOString().split("T")[0];
   const [form, setForm] = useState({ fecha: hoy, monto: monto, metodo: "Transferencia", notas: "" });
@@ -107,6 +113,7 @@ function RegistrarPagoModal({ inquilino, mes, monto, onClose, onSave }) {
   );
 }
 
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
 function Dashboard({ naves }) {
   const rentadas = naves.filter(n => calcularEstado(n) === "rentada").length;
   const disponibles = naves.filter(n => calcularEstado(n) === "disponible").length;
@@ -150,6 +157,7 @@ function Dashboard({ naves }) {
   );
 }
 
+// ─── MODAL EDITAR NAVE ────────────────────────────────────────────────────────
 function EditarNaveModal({ nave, onClose, onSave }) {
   const [form, setForm] = useState({ ...nave });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -197,16 +205,36 @@ function EditarNaveModal({ nave, onClose, onSave }) {
   );
 }
 
+// ─── NAVES ────────────────────────────────────────────────────────────────────
 function Naves({ naves, setNaves }) {
   const [editando, setEditando] = useState(null);
   const [busqueda, setBusqueda] = useState("");
   const [filtro, setFiltro] = useState("todos");
+  const [guardando, setGuardando] = useState(false);
 
-  const guardarNave = (updated) => setNaves(ns => ns.map(n => n.id === updated.id ? { ...n, ...updated } : n));
-  const agregarNave = (inmueble_id) => {
+  const guardarNave = async (updated) => {
+    setGuardando(true);
+    try {
+      await setDoc(doc(db, "naves", updated.id), updated);
+      setNaves(ns => ns.map(n => n.id === updated.id ? { ...n, ...updated } : n));
+    } catch (e) {
+      console.error("Error guardando nave:", e);
+    }
+    setGuardando(false);
+  };
+
+  const agregarNave = async (inmueble_id) => {
     const nombre = prompt("Nombre de la nave:");
     const m2 = prompt("Metros cuadrados:");
-    if (nombre && m2) setNaves(ns => [...ns, { id: Date.now(), inmueble_id, nombre, m2: Number(m2), renta: 0, inquilino: "", mantenimiento: false }]);
+    if (nombre && m2) {
+      const nueva = { inmueble_id, nombre, m2: Number(m2), renta: 0, inquilino: "", mantenimiento: false };
+      try {
+        const docRef = await addDoc(collection(db, "naves"), nueva);
+        setNaves(ns => [...ns, { ...nueva, id: docRef.id }]);
+      } catch (e) {
+        console.error("Error agregando nave:", e);
+      }
+    }
   };
 
   const rentaTotal = naves.reduce((s, n) => s + Number(n.renta), 0);
@@ -216,8 +244,10 @@ function Naves({ naves, setNaves }) {
   return (
     <div style={{ padding: "28px" }}>
       {editando && <EditarNaveModal nave={editando} onClose={() => setEditando(null)} onSave={guardarNave} />}
+      {guardando && <div style={{ position: "fixed", top: 20, right: 20, background: "#00C896", color: "#fff", padding: "10px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, zIndex: 300 }}>💾 Guardando en Firebase...</div>}
       <div style={{ fontSize: 20, fontWeight: 800, color: "#E8EDF5", marginBottom: 6 }}>🏭 Inmuebles y Naves</div>
-      <div style={{ fontSize: 12, color: "#3A5070", marginBottom: 20 }}>{inmuebles.length} inmuebles · {naves.length} naves</div>
+      <div style={{ fontSize: 12, color: "#3A5070", marginBottom: 20 }}>{inmuebles.length} inmuebles · {naves.length} naves · <span style={{ color: "#00C896" }}>✓ Conectado a Firebase</span></div>
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 20 }}>
         {[
           ["Total naves", naves.length, "#4E8CFF"],
@@ -232,6 +262,7 @@ function Naves({ naves, setNaves }) {
           </div>
         ))}
       </div>
+
       <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="🔍 Buscar..."
           style={{ flex: 1, minWidth: 220, background: "#0F1520", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 14px", fontSize: 13, color: "#E8EDF5", outline: "none" }} />
@@ -241,6 +272,7 @@ function Naves({ naves, setNaves }) {
           </button>
         ))}
       </div>
+
       {inmuebles.map(inm => {
         const navesInm = naves.filter(n => n.inmueble_id === inm.id);
         const rentadasInm = navesInm.filter(n => calcularEstado(n) === "rentada").length;
@@ -299,9 +331,15 @@ function Naves({ naves, setNaves }) {
   );
 }
 
+// ─── ESTADOS DE CUENTA ────────────────────────────────────────────────────────
 function EstadosCuenta({ naves }) {
-  const [mesFiltro, setMesFiltro] = useState("Abril 2026");
+  const mesActual = "Abril 2026";
+  const [mesFiltro, setMesFiltro] = useState(mesActual);
   const [registrando, setRegistrando] = useState(null);
+  const [pagos, setPagos] = useState({});
+  const [mesVisible, setMesVisible] = useState(0);
+
+  const mesesVisibles = mesesSistema.slice(mesVisible, mesVisible + 4);
 
   const getInquilinos = () => Object.values(
     inmuebles.flatMap(inm =>
@@ -316,34 +354,34 @@ function EstadosCuenta({ naves }) {
     }, {})
   );
 
-  const [pagos, setPagos] = useState(() => {
-    const inicial = {};
-    getInquilinos().forEach(inq => {
-      mesesSistema.forEach((mes, idx) => {
-        inicial[`${inq.empresa}__${mes}`] = {
-          estado: idx < 3 ? "pagado" : "pendiente",
-          fecha_pago: idx < 3 ? `2026-0${idx + 1}-05` : null,
-          monto: inq.renta,
-          metodo: "Transferencia",
-        };
-      });
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "pagos"), (snap) => {
+      const data = {};
+      snap.forEach(d => { data[d.id] = d.data(); });
+      setPagos(data);
     });
-    return inicial;
-  });
+    return () => unsub();
+  }, []);
+
+  const registrarPago = async (empresa, mes, data) => {
+    const key = `${empresa.replace(/\s+/g, "_")}__${mes.replace(/\s+/g, "_")}`;
+    await setDoc(doc(db, "pagos", key), { empresa, mes, ...data });
+  };
 
   const inquilinos = getInquilinos();
 
-  const registrarPago = (empresa, mes, data) => {
-    setPagos(p => ({ ...p, [`${empresa}__${mes}`]: { ...p[`${empresa}__${mes}`], ...data } }));
+  const getPago = (empresa, mes) => {
+    const key = `${empresa.replace(/\s+/g, "_")}__${mes.replace(/\s+/g, "_")}`;
+    return pagos[key] || { estado: "pendiente" };
   };
 
   const pagosDeMes = inquilinos.map(inq => ({
     ...inq,
-    pago: pagos[`${inq.empresa}__${mesFiltro}`] || { estado: "pendiente", monto: inq.renta },
+    pago: getPago(inq.empresa, mesFiltro),
   }));
 
   const totalMes = pagosDeMes.reduce((s, i) => s + i.renta, 0);
-  const cobradoMes = pagosDeMes.filter(i => i.pago.estado === "pagado").reduce((s, i) => s + i.renta, 0);
+  const cobradoMes = pagosDeMes.filter(i => getPago(i.empresa, mesFiltro).estado === "pagado").reduce((s, i) => s + i.renta, 0);
   const pendienteMes = totalMes - cobradoMes;
 
   return (
@@ -358,12 +396,19 @@ function EstadosCuenta({ naves }) {
         />
       )}
       <div style={{ fontSize: 20, fontWeight: 800, color: "#E8EDF5", marginBottom: 6 }}>💳 Estados de Cuenta</div>
-      <div style={{ fontSize: 12, color: "#3A5070", marginBottom: 20 }}>{inquilinos.length} inquilinos activos</div>
+      <div style={{ fontSize: 12, color: "#3A5070", marginBottom: 20 }}>{inquilinos.length} inquilinos · <span style={{ color: "#00C896" }}>✓ Guardado en Firebase</span></div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-        {mesesSistema.map(m => (
-          <button key={m} onClick={() => setMesFiltro(m)} style={{ flex: 1, padding: "10px", borderRadius: 10, border: `1px solid ${mesFiltro === m ? "#4E8CFF" : "#1E2740"}`, background: mesFiltro === m ? "#0D1A2E" : "#0F1520", color: mesFiltro === m ? "#4E8CFF" : "#4E6080", fontSize: 13, fontWeight: mesFiltro === m ? 700 : 400, cursor: "pointer" }}>{m}</button>
-        ))}
+      {/* Navegador de meses */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+        <button onClick={() => setMesVisible(Math.max(0, mesVisible - 1))} disabled={mesVisible === 0}
+          style={{ background: "#0F1520", border: "1px solid #1E2740", borderRadius: 8, color: mesVisible === 0 ? "#2A3A50" : "#4E8CFF", padding: "8px 12px", cursor: mesVisible === 0 ? "default" : "pointer", fontSize: 16 }}>◀</button>
+        <div style={{ display: "flex", gap: 8, flex: 1 }}>
+          {mesesVisibles.map(m => (
+            <button key={m} onClick={() => setMesFiltro(m)} style={{ flex: 1, padding: "10px", borderRadius: 10, border: `1px solid ${mesFiltro === m ? "#4E8CFF" : "#1E2740"}`, background: mesFiltro === m ? "#0D1A2E" : "#0F1520", color: mesFiltro === m ? "#4E8CFF" : "#4E6080", fontSize: 12, fontWeight: mesFiltro === m ? 700 : 400, cursor: "pointer" }}>{m}</button>
+          ))}
+        </div>
+        <button onClick={() => setMesVisible(Math.min(mesesSistema.length - 4, mesVisible + 1))} disabled={mesVisible >= mesesSistema.length - 4}
+          style={{ background: "#0F1520", border: "1px solid #1E2740", borderRadius: 8, color: mesVisible >= mesesSistema.length - 4 ? "#2A3A50" : "#4E8CFF", padding: "8px 12px", cursor: mesVisible >= mesesSistema.length - 4 ? "default" : "pointer", fontSize: 16 }}>▶</button>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
@@ -395,35 +440,38 @@ function EstadosCuenta({ naves }) {
               </tr>
             </thead>
             <tbody>
-              {pagosDeMes.map((inq, i) => (
-                <tr key={i} style={{ borderTop: "1px solid #141A28" }}
-                  onMouseEnter={e => e.currentTarget.style.background = "#141A28"}
-                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                  <td style={{ padding: "14px 16px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #4E8CFF, #00C896)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: "#fff" }}>{inq.empresa[0]}</div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#C8D8F0" }}>{inq.empresa}</div>
-                        {inq.pago.fecha_pago && <div style={{ fontSize: 11, color: "#3A5070" }}>Pagó: {inq.pago.fecha_pago}</div>}
+              {pagosDeMes.map((inq, i) => {
+                const pago = getPago(inq.empresa, mesFiltro);
+                return (
+                  <tr key={i} style={{ borderTop: "1px solid #141A28" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "#141A28"}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                    <td style={{ padding: "14px 16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #4E8CFF, #00C896)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: "#fff" }}>{inq.empresa[0]}</div>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "#C8D8F0" }}>{inq.empresa}</div>
+                          {pago.fecha_pago && <div style={{ fontSize: 11, color: "#3A5070" }}>Pagó: {pago.fecha}</div>}
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td style={{ padding: "14px 16px" }}>
-                    {inq.naves.map((n, j) => <div key={j} style={{ fontSize: 11, color: "#4E6080" }}>🏗️ {n.inmueble} — {n.nombre}</div>)}
-                  </td>
-                  <td style={{ padding: "14px 16px", fontSize: 14, fontWeight: 800, color: "#00C896" }}>${inq.renta.toLocaleString()}</td>
-                  <td style={{ padding: "14px 16px" }}><Badge estado={inq.pago.estado} tipo="pago" /></td>
-                  <td style={{ padding: "14px 16px" }}>
-                    {inq.pago.estado !== "pagado" ? (
-                      <button onClick={() => setRegistrando(inq)} style={{ background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 8, color: "#00C896", padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                        ✅ Registrar pago
-                      </button>
-                    ) : (
-                      <span style={{ fontSize: 12, color: "#3A5070" }}>✓ {inq.pago.metodo}</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td style={{ padding: "14px 16px" }}>
+                      {inq.naves.map((n, j) => <div key={j} style={{ fontSize: 11, color: "#4E6080" }}>🏗️ {n.inmueble} — {n.nombre}</div>)}
+                    </td>
+                    <td style={{ padding: "14px 16px", fontSize: 14, fontWeight: 800, color: "#00C896" }}>${inq.renta.toLocaleString()}</td>
+                    <td style={{ padding: "14px 16px" }}><Badge estado={pago.estado || "pendiente"} tipo="pago" /></td>
+                    <td style={{ padding: "14px 16px" }}>
+                      {pago.estado !== "pagado" ? (
+                        <button onClick={() => setRegistrando(inq)} style={{ background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 8, color: "#00C896", padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          ✅ Registrar pago
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: 12, color: "#3A5070" }}>✓ {pago.metodo}</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -432,9 +480,39 @@ function EstadosCuenta({ naves }) {
   );
 }
 
+// ─── APP PRINCIPAL ────────────────────────────────────────────────────────────
 export default function App() {
   const [active, setActive] = useState("dashboard");
-  const [naves, setNaves] = useState(navesIniciales);
+  const [naves, setNaves] = useState([]);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    const inicializarNaves = async () => {
+      try {
+        const snap = await getDocs(collection(db, "naves"));
+        if (snap.empty) {
+          // Primera vez — carga datos iniciales
+          for (const nave of navesIniciales) {
+            await setDoc(doc(db, "naves", nave.id), nave);
+          }
+          setNaves(navesIniciales);
+        } else {
+          setNaves(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        }
+      } catch (e) {
+        console.error("Error cargando naves:", e);
+        setNaves(navesIniciales);
+      }
+      setCargando(false);
+    };
+    inicializarNaves();
+  }, []);
+
+  if (cargando) return (
+    <div style={{ minHeight: "100vh", background: "#0A0E17", display: "flex", alignItems: "center", justifyContent: "center", color: "#4E8CFF", fontSize: 16, fontFamily: "sans-serif" }}>
+      🔄 Conectando con Firebase...
+    </div>
+  );
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#0A0E17", fontFamily: "'DM Sans','Segoe UI',sans-serif", color: "#E8EDF5" }}>
@@ -443,7 +521,7 @@ export default function App() {
           <div style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg, #00C896, #4E8CFF)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🏗️</div>
           <div>
             <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>INMOBILIARIA K9</div>
-            <div style={{ fontSize: 11, color: "#4E6080" }}>Panel de Control</div>
+            <div style={{ fontSize: 11, color: "#00C896" }}>● Conectado a Firebase</div>
           </div>
         </div>
         <nav style={{ flex: 1, padding: "12px 8px" }}>
