@@ -1,4 +1,4 @@
-https://inmobiliaria-k9.vercel.app/https://inmobiliaria-k9.vercel.app/import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { db } from "./firebase";
 import { collection, doc, getDocs, setDoc, addDoc, onSnapshot } from "firebase/firestore";
 
