@@ -8,11 +8,13 @@ import Dashboard from "./Dashboard";
 import Naves from "./Naves";
 import EstadosCuenta from "./EstadosCuenta";
 import ResumenAnual from "./ResumenAnual";
+import Propietarios from "./Propietarios";
 
 const auth = getAuth();
 
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: "▦" },
+  { id: "propietarios", label: "Propietarios", icon: "🏢" },
   { id: "naves", label: "Inmuebles y Naves", icon: "🏭" },
   { id: "estados", label: "Estados de Cuenta", icon: "💳" },
   { id: "resumen", label: "Resumen Anual", icon: "📊" },
@@ -39,7 +41,6 @@ export default function App() {
   const [cargando, setCargando] = useState(true);
   const pagos = usePagos();
 
-  // Verificar si hay sesión activa
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setUsuario(user);
@@ -48,7 +49,6 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // Cargar naves de Firebase
   useEffect(() => {
     if (!usuario) return;
     const inicializar = async () => {
@@ -77,17 +77,14 @@ export default function App() {
     setNaves([]);
   };
 
-  // Pantalla de carga inicial
   if (verificando) return (
     <div style={{ minHeight: "100vh", background: "#0A0E17", display: "flex", alignItems: "center", justifyContent: "center", color: "#4E8CFF", fontSize: 16, fontFamily: "sans-serif" }}>
       🔄 Verificando sesión...
     </div>
   );
 
-  // Pantalla de login si no hay sesión
   if (!usuario) return <Login onLogin={() => {}} />;
 
-  // Cargando datos
   if (cargando) return (
     <div style={{ minHeight: "100vh", background: "#0A0E17", display: "flex", alignItems: "center", justifyContent: "center", color: "#4E8CFF", fontSize: 16, fontFamily: "sans-serif" }}>
       🔄 Cargando datos...
@@ -96,8 +93,6 @@ export default function App() {
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#0A0E17", fontFamily: "'DM Sans','Segoe UI',sans-serif", color: "#E8EDF5" }}>
-
-      {/* Sidebar */}
       <aside style={{ width: 240, background: "#0F1520", borderRight: "1px solid #1E2740", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh" }}>
         <div style={{ padding: "24px 16px", borderBottom: "1px solid #1E2740", display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg, #00C896, #4E8CFF)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🏗️</div>
@@ -107,7 +102,7 @@ export default function App() {
           </div>
         </div>
 
-        <nav style={{ flex: 1, padding: "12px 8px" }}>
+        <nav style={{ flex: 1, padding: "12px 8px", overflowY: "auto" }}>
           {navItems.map(item => (
             <button key={item.id} onClick={() => setActive(item.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 8, border: "none", cursor: "pointer", textAlign: "left", width: "100%", background: active === item.id ? "rgba(0,200,150,0.1)" : "transparent", color: active === item.id ? "#00C896" : "#5A7090", borderLeft: active === item.id ? "2px solid #00C896" : "2px solid transparent", fontSize: 13, fontWeight: active === item.id ? 600 : 400, marginBottom: 2 }}>
               <span style={{ fontSize: 16 }}>{item.icon}</span>
@@ -132,9 +127,9 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Contenido */}
       <main style={{ flex: 1, overflow: "auto" }}>
         {active === "dashboard" && <Dashboard naves={naves} pagos={pagos} />}
+        {active === "propietarios" && <Propietarios />}
         {active === "naves" && <Naves naves={naves} setNaves={setNaves} />}
         {active === "estados" && <EstadosCuenta naves={naves} pagos={pagos} />}
         {active === "resumen" && <ResumenAnual naves={naves} pagos={pagos} />}
