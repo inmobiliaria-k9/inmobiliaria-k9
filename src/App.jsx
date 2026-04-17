@@ -1,15 +1,16 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, doc, getDocs, setDoc, onSnapshot, addDoc, query, where } from "firebase/firestore";
-import { navesIniciales, MES_ACTUAL, inmuebles } from "./utils";
+import { collection, doc, getDocs, setDoc, onSnapshot, addDoc } from "firebase/firestore";
+import { navesIniciales, MES_ACTUAL } from "./utils";
 import Login from "./Login";
 import Dashboard from "./Dashboard";
 import Naves from "./Naves";
-import EstadosCuenta from "./EstadosCuenta";
+import CuentasPorCobrar from "./CuentasPorCobrar";
 import ResumenAnual from "./ResumenAnual";
 import Propietarios from "./Propietarios";
 import Inquilinos from "./Inquilinos";
+import EstadosCuenta from "./EstadosCuenta";
 
 const auth = getAuth();
 
@@ -18,7 +19,8 @@ const navItems = [
   { id: "propietarios", label: "Propietarios", icon: "🏢" },
   { id: "naves", label: "Inmuebles y Naves", icon: "🏭" },
   { id: "inquilinos", label: "Inquilinos", icon: "👥" },
-  { id: "estados", label: "Estados de Cuenta", icon: "💳" },
+  { id: "cobrar", label: "Cuentas por Cobrar", icon: "💳" },
+  { id: "estados", label: "Estados de Cuenta", icon: "🏦" },
   { id: "resumen", label: "Resumen Anual", icon: "📊" },
 ];
 
@@ -80,35 +82,24 @@ export default function App() {
       const navesSnap = await getDocs(collection(db, "naves"));
       const todasNaves = navesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const navesConInquilino = todasNaves.filter(n => n.inquilino && n.inquilino.trim() !== "");
-
       const inquilinosSnap = await getDocs(collection(db, "inquilinos"));
       const aliasExistentes = inquilinosSnap.docs.map(d => d.data().alias?.toLowerCase());
-
       let creados = 0;
       for (const nave of navesConInquilino) {
         const alias = nave.inquilino.trim();
         if (aliasExistentes.includes(alias.toLowerCase())) continue;
-
         await addDoc(collection(db, "inquilinos"), {
-          alias: alias,
-          razon_social: "",
-          rfc: "",
-          contacto: "",
-          telefono: "",
-          correo: "",
-          nave_id: nave.id,
-          inmueble_id: nave.inmueble_id,
-          fecha_inicio: "",
-          fecha_fin: "",
+          alias, razon_social: "", rfc: "", contacto: "", telefono: "", correo: "",
+          nave_id: nave.id, inmueble_id: nave.inmueble_id,
+          fecha_inicio: "", fecha_fin: "",
           notas: "Migrado automáticamente desde naves",
         });
         creados++;
       }
-      alert(`✅ Migración completada. ${creados} inquilino${creados !== 1 ? "s" : ""} creado${creados !== 1 ? "s" : ""}.`);
+      alert(`✅ ${creados} inquilino${creados !== 1 ? "s" : ""} creado${creados !== 1 ? "s" : ""}.`);
       setActive("inquilinos");
     } catch (e) {
-      console.error(e);
-      alert("Error en la migración. Intenta de nuevo.");
+      alert("Error en la migración.");
     }
     setMigrando(false);
   };
@@ -152,7 +143,6 @@ export default function App() {
             </button>
           ))}
 
-          {/* Botón de migración — solo aparece si hay naves con inquilino */}
           {naves.some(n => n.inquilino && n.inquilino.trim() !== "") && (
             <button onClick={migrarInquilinos} disabled={migrando}
               style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 8, border: "1px dashed #FFB54744", cursor: migrando ? "default" : "pointer", textAlign: "left", width: "100%", background: "#2A2000", color: "#FFB547", fontSize: 12, fontWeight: 600, marginTop: 8 }}>
@@ -183,7 +173,8 @@ export default function App() {
         {active === "propietarios" && <Propietarios />}
         {active === "naves" && <Naves naves={naves} setNaves={setNaves} />}
         {active === "inquilinos" && <Inquilinos />}
-        {active === "estados" && <EstadosCuenta naves={naves} pagos={pagos} />}
+        {active === "cobrar" && <CuentasPorCobrar naves={naves} pagos={pagos} />}
+        {active === "estados" && <EstadosCuenta />}
         {active === "resumen" && <ResumenAnual naves={naves} pagos={pagos} />}
       </main>
     </div>
