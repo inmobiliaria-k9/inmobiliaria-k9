@@ -3,7 +3,7 @@ import { db } from "./firebase";
 import { doc, setDoc, collection, getDocs } from "firebase/firestore";
 import {
   MES_ACTUAL, TODOS_LOS_MESES, estadoPagoAutomatico,
-  getPagoKey, inmuebles, pagoConfig
+  getPagoKey, inmuebles
 } from "./utils";
 import { Badge } from "./Badge";
 
@@ -22,7 +22,17 @@ function getInquilinos(naves) {
   );
 }
 
-function RegistrarPagoModal({ inquilino, mes, monto, onClose, onSave }) {
+// Obtiene los meses con deuda pendiente o vencida de un inquilino
+function getMesesDeuda(empresa, pagos) {
+  return TODOS_LOS_MESES.filter(mes => {
+    const key = getPagoKey(empresa, mes);
+    const pagoDB = pagos[key];
+    const estado = estadoPagoAutomatico(mes, pagoDB);
+    return estado === "vencido" || estado === "pendiente";
+  });
+}
+
+function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
   const fechaHoy = new Date().toISOString().split("T")[0];
   const [cuentas, setCuentas] = useState([]);
   const [form, setForm] = useState({
@@ -40,6 +50,10 @@ function RegistrarPagoModal({ inquilino, mes, monto, onClose, onSave }) {
   });
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const mesesDeuda = getMesesDeuda(inquilino.empresa, pagos);
+  const mesAplicar = mesesDeuda[0] || MES_ACTUAL;
+  const monto = inquilino.renta;
 
   useEffect(() => {
     const cargarCuentas = async () => {
@@ -65,13 +79,11 @@ function RegistrarPagoModal({ inquilino, mes, monto, onClose, onSave }) {
     if (c) { set("cuenta_id", id); set("cuenta_nombre", `${c.nombre} — ${c.banco}`); }
   };
 
-  // Cálculos fiscales
   const iva = form.aplica_iva ? monto * (form.pct_iva / 100) : 0;
   const totalFactura = monto + iva;
   const retIva = form.aplica_ret_iva ? monto * (form.pct_ret_iva / 100) : 0;
   const retIsr = form.aplica_ret_isr ? monto * (form.pct_ret_isr / 100) : 0;
   const montoNeto = totalFactura - retIva - retIsr;
-
   const fmt = n => `$${Math.round(n).toLocaleString()}`;
 
   const Toggle = ({ activo, onChange }) => (
@@ -87,12 +99,38 @@ function RegistrarPagoModal({ inquilino, mes, monto, onClose, onSave }) {
         <div style={{ padding: "20px 24px", borderBottom: "1px solid #1E2740", display: "flex", justifyContent: "space-between" }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 700, color: "#E8EDF5" }}>✅ Registrar pago</div>
-            <div style={{ fontSize: 12, color: "#4E6080", marginTop: 2 }}>{inquilino} · {mes}</div>
+            <div style={{ fontSize: 12, color: "#4E6080", marginTop: 2 }}>{inquilino.empresa}</div>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#4E6080", cursor: "pointer", fontSize: 20 }}>✕</button>
         </div>
 
         <div style={{ padding: "20px 24px" }}>
+
+          {/* Deuda pendiente */}
+          <div style={{ background: "#0A0E17", borderRadius: 10, border: "1px solid #1E2740", padding: "12px 14px", marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: "#4E6080", marginBottom: 8, fontWeight: 600 }}>DEUDA PENDIENTE</div>
+            {mesesDeuda.length === 0 ? (
+              <div style={{ fontSize: 13, color: "#00C896" }}>✓ Al corriente</div>
+            ) : (
+              mesesDeuda.map((mes, i) => (
+                <div key={mes} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: i < mesesDeuda.length - 1 ? "1px solid #141A28" : "none" }}>
+                  <span style={{ fontSize: 12, color: i === 0 ? "#FFB547" : "#4E6080", fontWeight: i === 0 ? 700 : 400 }}>
+                    {i === 0 ? "→ " : ""}{mes}
+                  </span>
+                  <span style={{ fontSize: 12, color: i === 0 ? "#FF5C5C" : "#3A5070", fontWeight: 700 }}>${inquilino.renta.toLocaleString()}</span>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Mes que se va a pagar */}
+          <div style={{ background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 10, padding: "10px 14px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ fontSize: 11, color: "#00C896", fontWeight: 600, marginBottom: 2 }}>APLICANDO PAGO A</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#E8EDF5" }}>{mesAplicar}</div>
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#00C896" }}>${monto.toLocaleString()}</div>
+          </div>
 
           {/* Fecha y método */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
@@ -130,8 +168,8 @@ function RegistrarPagoModal({ inquilino, mes, monto, onClose, onSave }) {
 
           {[
             { label: "IVA", sub: "Impuesto al valor agregado", key_activo: "aplica_iva", key_pct: "pct_iva" },
-            { label: "Retención IVA", sub: "Retención de IVA por el cliente", key_activo: "aplica_ret_iva", key_pct: "pct_ret_iva" },
-            { label: "Retención ISR", sub: "Retención de ISR por el cliente", key_activo: "aplica_ret_isr", key_pct: "pct_ret_isr" },
+            { label: "Retención IVA", sub: "Retención de IVA", key_activo: "aplica_ret_iva", key_pct: "pct_ret_iva" },
+            { label: "Retención ISR", sub: "Retención de ISR", key_activo: "aplica_ret_isr", key_pct: "pct_ret_isr" },
           ].map(({ label, sub, key_activo, key_pct }) => (
             <div key={key_activo} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: form[key_activo] ? "#0D2E1F" : "#0A0E17", borderRadius: 10, padding: "10px 14px", border: `1px solid ${form[key_activo] ? "#00C89633" : "#1E2740"}`, marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -149,15 +187,15 @@ function RegistrarPagoModal({ inquilino, mes, monto, onClose, onSave }) {
             </div>
           ))}
 
-          {/* Resumen cálculo */}
+          {/* Cálculo */}
           <div style={{ background: "#0A0E17", borderRadius: 10, border: "1px solid #1E2740", padding: "14px", marginTop: 4, marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: "#4E6080", fontWeight: 700, marginBottom: 10 }}>CÁLCULO</div>
             {[
               ["Renta base", fmt(monto), "#4E6080"],
               form.aplica_iva && [`+ IVA ${form.pct_iva}%`, `+${fmt(iva)}`, "#4E8CFF"],
               ["Total factura", fmt(totalFactura), "#C8D8F0"],
-              form.aplica_ret_iva && [`- Retención IVA ${form.pct_ret_iva}%`, `-${fmt(retIva)}`, "#FF5C5C"],
-              form.aplica_ret_isr && [`- Retención ISR ${form.pct_ret_isr}%`, `-${fmt(retIsr)}`, "#FF5C5C"],
+              form.aplica_ret_iva && [`- Ret. IVA ${form.pct_ret_iva}%`, `-${fmt(retIva)}`, "#FF5C5C"],
+              form.aplica_ret_isr && [`- Ret. ISR ${form.pct_ret_isr}%`, `-${fmt(retIsr)}`, "#FF5C5C"],
             ].filter(Boolean).map(([l, v, c], i) => (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: "1px solid #141A28" }}>
                 <span style={{ color: "#4E6080" }}>{l}</span>
@@ -181,6 +219,7 @@ function RegistrarPagoModal({ inquilino, mes, monto, onClose, onSave }) {
             <button onClick={onClose} style={{ flex: 1, background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#4E6080", padding: 11, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
             <button onClick={() => {
               onSave({
+                mes: mesAplicar,
                 ...form,
                 estado: "pagado",
                 monto: montoNeto,
@@ -202,16 +241,16 @@ function RegistrarPagoModal({ inquilino, mes, monto, onClose, onSave }) {
 }
 
 export default function CuentasPorCobrar({ naves, pagos }) {
-  const [mesFiltro, setMesFiltro] = useState(MES_ACTUAL);
   const [registrando, setRegistrando] = useState(null);
+  const [mesFiltro, setMesFiltro] = useState(MES_ACTUAL);
   const [mesVisible, setMesVisible] = useState(Math.max(0, TODOS_LOS_MESES.length - 4));
 
   const mesesVisibles = TODOS_LOS_MESES.slice(mesVisible, mesVisible + 4);
   const inquilinos = getInquilinos(naves);
 
-  const registrarPago = async (empresa, mes, data) => {
-    const key = getPagoKey(empresa, mes);
-    await setDoc(doc(db, "pagos", key), { empresa, mes, ...data });
+  const registrarPago = async (empresa, data) => {
+    const key = getPagoKey(empresa, data.mes);
+    await setDoc(doc(db, "pagos", key), { empresa, ...data });
   };
 
   const pagosDeMes = inquilinos.map(inq => {
@@ -223,15 +262,20 @@ export default function CuentasPorCobrar({ naves, pagos }) {
   const totalMes = pagosDeMes.reduce((s, i) => s + i.renta, 0);
   const cobradoMes = pagosDeMes.filter(i => i.pago.estado === "pagado").reduce((s, i) => s + (i.pago.monto_base || i.renta), 0);
 
+  // Inquilinos con deuda más antigua
+  const inquilinosConDeuda = inquilinos.map(inq => {
+    const mesesDeuda = getMesesDeuda(inq.empresa, pagos);
+    return { ...inq, mesesDeuda, mesOldest: mesesDeuda[0] };
+  });
+
   return (
     <div style={{ padding: "28px" }}>
       {registrando && (
         <RegistrarPagoModal
-          inquilino={registrando.empresa}
-          mes={mesFiltro}
-          monto={registrando.renta}
+          inquilino={registrando}
+          pagos={pagos}
           onClose={() => setRegistrando(null)}
-          onSave={(data) => registrarPago(registrando.empresa, mesFiltro, data)}
+          onSave={(data) => registrarPago(registrando.empresa, data)}
         />
       )}
 
@@ -240,7 +284,65 @@ export default function CuentasPorCobrar({ naves, pagos }) {
         Mes actual: <span style={{ color: "#4E8CFF", fontWeight: 600 }}>{MES_ACTUAL}</span>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+      {/* Resumen de deuda por inquilino */}
+      <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden", marginBottom: 20 }}>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid #1E2740", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0" }}>Estado de cuenta por inquilino</div>
+          <div style={{ fontSize: 12, color: "#3A5070" }}>El pago se aplica al mes más antiguo automáticamente</div>
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: "#080C14" }}>
+              {["Inquilino", "Mes más antiguo", "Meses vencidos", "Total adeudo", "Acción"].map(h => (
+                <th key={h} style={{ padding: "10px 16px", fontSize: 11, color: "#3A5070", textAlign: "left", fontWeight: 600, textTransform: "uppercase" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {inquilinosConDeuda.map((inq, i) => (
+              <tr key={i} style={{ borderTop: "1px solid #141A28" }}
+                onMouseEnter={e => e.currentTarget.style.background = "#141A28"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                <td style={{ padding: "14px 16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #4E8CFF, #00C896)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: "#fff" }}>{inq.empresa[0]}</div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#C8D8F0" }}>{inq.empresa}</div>
+                      <div style={{ fontSize: 11, color: "#3A5070" }}>${inq.renta.toLocaleString()}/mes</div>
+                    </div>
+                  </div>
+                </td>
+                <td style={{ padding: "14px 16px" }}>
+                  {inq.mesOldest ? (
+                    <span style={{ background: "#2E0D0D", color: "#FF5C5C", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600 }}>{inq.mesOldest}</span>
+                  ) : (
+                    <span style={{ color: "#00C896", fontSize: 12 }}>✓ Al corriente</span>
+                  )}
+                </td>
+                <td style={{ padding: "14px 16px", fontSize: 14, fontWeight: 800, color: inq.mesesDeuda.length > 0 ? "#FF5C5C" : "#00C896" }}>
+                  {inq.mesesDeuda.length > 0 ? inq.mesesDeuda.length : "—"}
+                </td>
+                <td style={{ padding: "14px 16px", fontSize: 14, fontWeight: 800, color: inq.mesesDeuda.length > 0 ? "#FF5C5C" : "#00C896" }}>
+                  {inq.mesesDeuda.length > 0 ? `$${(inq.renta * inq.mesesDeuda.length).toLocaleString()}` : "—"}
+                </td>
+                <td style={{ padding: "14px 16px" }}>
+                  {inq.mesesDeuda.length > 0 ? (
+                    <button onClick={() => setRegistrando(inq)} style={{ background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 8, color: "#00C896", padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      ✅ Registrar pago
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: 12, color: "#3A5070" }}>Al corriente ✓</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Vista por mes */}
+      <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>Vista por mes</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
         <button onClick={() => setMesVisible(Math.max(0, mesVisible - 1))} disabled={mesVisible === 0}
           style={{ background: "#0F1520", border: "1px solid #1E2740", borderRadius: 8, color: mesVisible === 0 ? "#2A3A50" : "#4E8CFF", padding: "8px 14px", cursor: mesVisible === 0 ? "default" : "pointer", fontSize: 16 }}>◀</button>
         <div style={{ display: "flex", gap: 8, flex: 1 }}>
@@ -252,7 +354,7 @@ export default function CuentasPorCobrar({ naves, pagos }) {
           style={{ background: "#0F1520", border: "1px solid #1E2740", borderRadius: 8, color: mesVisible >= TODOS_LOS_MESES.length - 4 ? "#2A3A50" : "#4E8CFF", padding: "8px 14px", cursor: mesVisible >= TODOS_LOS_MESES.length - 4 ? "default" : "pointer", fontSize: 16 }}>▶</button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 16 }}>
         {[
           ["Total a cobrar", `$${totalMes.toLocaleString()}`, "#E8EDF5"],
           ["Cobrado", `$${cobradoMes.toLocaleString()}`, "#00C896"],
@@ -264,62 +366,6 @@ export default function CuentasPorCobrar({ naves, pagos }) {
           </div>
         ))}
       </div>
-
-      {inquilinos.length === 0 ? (
-        <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", padding: "60px", textAlign: "center", color: "#3A5070" }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🏗️</div>
-          <div>No hay naves rentadas aún</div>
-        </div>
-      ) : (
-        <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ background: "#080C14" }}>
-                {["Inquilino", "Naves", "Renta base", `Estado ${mesFiltro}`, "Acción"].map(h => (
-                  <th key={h} style={{ padding: "11px 16px", fontSize: 11, color: "#3A5070", textAlign: "left", fontWeight: 600, textTransform: "uppercase" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {pagosDeMes.map((inq, i) => (
-                <tr key={i} style={{ borderTop: "1px solid #141A28" }}
-                  onMouseEnter={e => e.currentTarget.style.background = "#141A28"}
-                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                  <td style={{ padding: "14px 16px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #4E8CFF, #00C896)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: "#fff" }}>{inq.empresa[0]}</div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#C8D8F0" }}>{inq.empresa}</div>
-                        {inq.pago.fecha && <div style={{ fontSize: 11, color: "#3A5070" }}>Pagó: {inq.pago.fecha}</div>}
-                        {inq.pago.cuenta_nombre && <div style={{ fontSize: 11, color: "#00C896" }}>💰 {inq.pago.cuenta_nombre}</div>}
-                      </div>
-                    </div>
-                  </td>
-                  <td style={{ padding: "14px 16px" }}>
-                    {inq.naves.map((n, j) => <div key={j} style={{ fontSize: 11, color: "#4E6080" }}>🏗️ {n.inmueble} — {n.nombre}</div>)}
-                  </td>
-                  <td style={{ padding: "14px 16px" }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: "#00C896" }}>${inq.renta.toLocaleString()}</div>
-                    {inq.pago.estado === "pagado" && inq.pago.monto && (
-                      <div style={{ fontSize: 11, color: "#3A5070" }}>Entró: ${Number(inq.pago.monto).toLocaleString()}</div>
-                    )}
-                  </td>
-                  <td style={{ padding: "14px 16px" }}><Badge estado={inq.pago.estado} tipo="pago" /></td>
-                  <td style={{ padding: "14px 16px" }}>
-                    {inq.pago.estado !== "pagado" && inq.pago.estado !== "futuro" ? (
-                      <button onClick={() => setRegistrando(inq)} style={{ background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 8, color: "#00C896", padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                        ✅ Registrar pago
-                      </button>
-                    ) : inq.pago.estado === "pagado" ? (
-                      <span style={{ fontSize: 12, color: "#3A5070" }}>✓ {inq.pago.metodo}</span>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }
