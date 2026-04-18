@@ -1,9 +1,7 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
 import { doc, setDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
-import {
-  MES_ACTUAL, TODOS_LOS_MESES, estadoPagoAutomatico, getPagoKey
-} from "./utils";
+import { MES_ACTUAL, TODOS_LOS_MESES, estadoPagoAutomatico, getPagoKey } from "./utils";
 import { Badge } from "./Badge";
 
 const CUENTA_EFECTIVO = { id: "efectivo", nombre: "Efectivo", banco: "Caja general", propietario: "General" };
@@ -23,13 +21,20 @@ function getInquilinos(naves, inmuebles) {
   );
 }
 
-function getMesesDeuda(empresa, pagos) {
+function getMesesDeuda(empresa, pagos, renta) {
   return TODOS_LOS_MESES.filter(mes => {
     const key = getPagoKey(empresa, mes);
     const pagoDB = pagos[key];
-    const estado = estadoPagoAutomatico(mes, pagoDB);
-    return estado === "vencido" || estado === "pendiente";
+    const estado = estadoPagoAutomatico(mes, pagoDB, renta);
+    return estado === "vencido" || estado === "pendiente" || estado === "parcial";
   });
+}
+
+function getSaldoPendiente(pagoDB, renta) {
+  if (!pagoDB) return renta;
+  if (pagoDB.estado === "pagado") return 0;
+  if (pagoDB.monto_base) return Math.max(0, renta - Number(pagoDB.monto_base));
+  return renta;
 }
 
 function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
@@ -37,16 +42,22 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
   const [cuentas, setCuentas] = useState([CUENTA_EFECTIVO]);
   const [form, setForm] = useState({
     fecha: fechaHoy, metodo: "Transferencia",
-    cuenta_id: "", cuenta_nombre: "", notas: "",
+    cuenta_id: "efectivo", cuenta_nombre: "Efectivo — Caja general", notas: "",
     aplica_iva: true, pct_iva: 16,
     aplica_ret_iva: true, pct_ret_iva: 10.67,
     aplica_ret_isr: true, pct_ret_isr: 10,
   });
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const mesesDeuda = getMesesDeuda(inquilino.empresa, pagos);
+  const mesesDeuda = getMesesDeuda(inquilino.empresa, pagos, inquilino.renta);
   const mesAplicar = mesesDeuda[0] || MES_ACTUAL;
-  const monto = inquilino.renta;
+
+  // Calcular saldo pendiente del mes más antiguo
+  const pagoExistente = pagos[getPagoKey(inquilino.empresa, mesAplicar)];
+  const saldoPendiente = getSaldoPendiente(pagoExistente, inquilino.renta);
+  const abonoPrevio = pagoExistente?.monto_base ? Number(pagoExistente.monto_base) : 0;
+
+  const [montoAbono, setMontoAbono] = useState(saldoPendiente);
 
   useEffect(() => {
     const cargarCuentas = async () => {
@@ -59,8 +70,6 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
         });
       });
       setCuentas(lista);
-      set("cuenta_id", lista[0].id);
-      set("cuenta_nombre", `${lista[0].nombre} — ${lista[0].banco}`);
     };
     cargarCuentas();
   }, []);
@@ -68,21 +77,24 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
   const seleccionarCuenta = (id) => {
     const c = cuentas.find(c => c.id === id);
     if (c) {
-      set("cuenta_id", id);
-      set("cuenta_nombre", `${c.nombre} — ${c.banco}`);
-      // Si es efectivo, desactivar IVA y retenciones automáticamente
       if (id === "efectivo") {
         setForm(f => ({ ...f, cuenta_id: id, cuenta_nombre: `${c.nombre} — ${c.banco}`, aplica_iva: false, aplica_ret_iva: false, aplica_ret_isr: false }));
+      } else {
+        set("cuenta_id", id);
+        set("cuenta_nombre", `${c.nombre} — ${c.banco}`);
       }
     }
   };
 
-  const iva = form.aplica_iva ? monto * (form.pct_iva / 100) : 0;
-  const totalFactura = monto + iva;
-  const retIva = form.aplica_ret_iva ? monto * (form.pct_ret_iva / 100) : 0;
-  const retIsr = form.aplica_ret_isr ? monto * (form.pct_ret_isr / 100) : 0;
+  const iva = form.aplica_iva ? montoAbono * (form.pct_iva / 100) : 0;
+  const totalFactura = montoAbono + iva;
+  const retIva = form.aplica_ret_iva ? montoAbono * (form.pct_ret_iva / 100) : 0;
+  const retIsr = form.aplica_ret_isr ? montoAbono * (form.pct_ret_isr / 100) : 0;
   const montoNeto = totalFactura - retIva - retIsr;
   const fmt = n => `$${Math.round(n).toLocaleString()}`;
+
+  const esCompletoPago = montoAbono >= saldoPendiente;
+  const nuevoMonto = abonoPrevio + Number(montoAbono);
 
   const Toggle = ({ activo, onChange }) => (
     <div onClick={onChange} style={{ width: 44, height: 24, borderRadius: 12, cursor: "pointer", background: activo ? "#00C896" : "#1A2535", position: "relative", border: `1px solid ${activo ? "#00C896" : "#1E2740"}`, flexShrink: 0 }}>
@@ -103,24 +115,49 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
         </div>
 
         <div style={{ padding: "20px 24px" }}>
+
+          {/* Deuda */}
           <div style={{ background: "#0A0E17", borderRadius: 10, border: "1px solid #1E2740", padding: "12px 14px", marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: "#4E6080", marginBottom: 8, fontWeight: 600 }}>DEUDA PENDIENTE</div>
             {mesesDeuda.length === 0 ? (
               <div style={{ fontSize: 13, color: "#00C896" }}>Al corriente</div>
-            ) : mesesDeuda.map((mes, i) => (
-              <div key={mes} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: i < mesesDeuda.length - 1 ? "1px solid #141A28" : "none" }}>
-                <span style={{ fontSize: 12, color: i === 0 ? "#FFB547" : "#4E6080", fontWeight: i === 0 ? 700 : 400 }}>{i === 0 ? "-> " : ""}{mes}</span>
-                <span style={{ fontSize: 12, color: i === 0 ? "#FF5C5C" : "#3A5070", fontWeight: 700 }}>${inquilino.renta.toLocaleString()}</span>
-              </div>
-            ))}
+            ) : mesesDeuda.map((mes, i) => {
+              const p = pagos[getPagoKey(inquilino.empresa, mes)];
+              const saldo = getSaldoPendiente(p, inquilino.renta);
+              const abono = p?.monto_base ? Number(p.monto_base) : 0;
+              return (
+                <div key={mes} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: i < mesesDeuda.length - 1 ? "1px solid #141A28" : "none" }}>
+                  <span style={{ fontSize: 12, color: i === 0 ? "#FFB547" : "#4E6080", fontWeight: i === 0 ? 700 : 400 }}>
+                    {i === 0 ? "-> " : ""}{mes}
+                    {abono > 0 && <span style={{ color: "#4E8CFF", fontSize: 11 }}> (abonado: ${abono.toLocaleString()})</span>}
+                  </span>
+                  <span style={{ fontSize: 12, color: i === 0 ? "#FF5C5C" : "#3A5070", fontWeight: 700 }}>${saldo.toLocaleString()}</span>
+                </div>
+              );
+            })}
           </div>
 
-          <div style={{ background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 10, padding: "10px 14px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <div style={{ fontSize: 11, color: "#00C896", fontWeight: 600, marginBottom: 2 }}>APLICANDO PAGO A</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#E8EDF5" }}>{mesAplicar}</div>
+          {/* Mes a aplicar */}
+          <div style={{ background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 10, padding: "10px 14px", marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: "#00C896", fontWeight: 600, marginBottom: 4 }}>APLICANDO A: {mesAplicar}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 12, color: "#4E6080" }}>
+                Renta: ${inquilino.renta.toLocaleString()} · Pendiente: ${saldoPendiente.toLocaleString()}
+                {abonoPrevio > 0 && <span style={{ color: "#4E8CFF" }}> · Ya abonado: ${abonoPrevio.toLocaleString()}</span>}
+              </div>
             </div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: "#00C896" }}>${monto.toLocaleString()}</div>
+          </div>
+
+          {/* Monto del abono */}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>
+              Monto del abono ($) — Pendiente: ${saldoPendiente.toLocaleString()}
+            </label>
+            <input value={montoAbono} onChange={e => setMontoAbono(Number(e.target.value))} type="number" max={saldoPendiente}
+              style={{ width: "100%", background: "#0A0E17", border: `1px solid ${montoAbono >= saldoPendiente ? "#00C89633" : "#FFB54733"}`, borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box" }} />
+            <div style={{ fontSize: 11, marginTop: 4, color: esCompletoPago ? "#00C896" : "#FFB547" }}>
+              {esCompletoPago ? "Pago completo — se marcara como pagado" : `Abono parcial — quedara pendiente: $${(saldoPendiente - montoAbono).toLocaleString()}`}
+            </div>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
@@ -130,7 +167,7 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
                 style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box" }} />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Metodo de pago</label>
+              <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Metodo</label>
               <select value={form.metodo} onChange={e => set("metodo", e.target.value)}
                 style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none" }}>
                 {["Transferencia", "Efectivo", "Cheque", "Deposito", "Otro"].map(m => <option key={m}>{m}</option>)}
@@ -144,15 +181,10 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
               style={{ width: "100%", background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#00C896", outline: "none", fontWeight: 600 }}>
               {cuentas.map(c => (
                 <option key={c.id} value={c.id}>
-                  {c.id === "efectivo" ? "💵 Efectivo — Caja general" : `${c.nombre} — ${c.banco} (${c.propietario})`}
+                  {c.id === "efectivo" ? "Efectivo — Caja general" : `${c.nombre} — ${c.banco} (${c.propietario})`}
                 </option>
               ))}
             </select>
-            {form.cuenta_id === "efectivo" && (
-              <div style={{ fontSize: 11, color: "#FFB547", marginTop: 6, background: "#2A2000", borderRadius: 6, padding: "6px 10px" }}>
-                Efectivo: IVA y retenciones desactivados automaticamente
-              </div>
-            )}
           </div>
 
           <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>Impuestos y retenciones</div>
@@ -180,7 +212,7 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
           <div style={{ background: "#0A0E17", borderRadius: 10, border: "1px solid #1E2740", padding: "14px", marginTop: 4, marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: "#4E6080", fontWeight: 700, marginBottom: 10 }}>CALCULO</div>
             {[
-              ["Renta base", fmt(monto), "#4E6080"],
+              ["Abono base", fmt(montoAbono), "#4E6080"],
               form.aplica_iva && [`+ IVA ${form.pct_iva}%`, `+${fmt(iva)}`, "#4E8CFF"],
               ["Total factura", fmt(totalFactura), "#C8D8F0"],
               form.aplica_ret_iva && [`- Ret. IVA ${form.pct_ret_iva}%`, `-${fmt(retIva)}`, "#FF5C5C"],
@@ -206,10 +238,21 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onClose} style={{ flex: 1, background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#4E6080", padding: 11, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
             <button onClick={() => {
-              onSave({ mes: mesAplicar, ...form, estado: "pagado", monto: montoNeto, monto_base: monto, iva: Math.round(iva), ret_iva: Math.round(retIva), ret_isr: Math.round(retIsr), total_factura: Math.round(totalFactura) });
+              const estadoFinal = esCompletoPago ? "pagado" : "parcial";
+              onSave({
+                mes: mesAplicar,
+                ...form,
+                estado: estadoFinal,
+                monto: montoNeto,
+                monto_base: nuevoMonto,
+                iva: Math.round(iva),
+                ret_iva: Math.round(retIva),
+                ret_isr: Math.round(retIsr),
+                total_factura: Math.round(totalFactura),
+              });
               onClose();
             }} style={{ flex: 2, background: "linear-gradient(135deg, #00C896, #4E8CFF)", border: "none", borderRadius: 8, color: "#fff", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-              Confirmar pago
+              {esCompletoPago ? "Confirmar pago completo" : "Registrar abono parcial"}
             </button>
           </div>
         </div>
@@ -239,18 +282,16 @@ export default function CuentasPorCobrar({ naves, pagos }) {
     await setDoc(doc(db, "pagos", key), { empresa, ...data });
   };
 
-  const pagosDeMes = inquilinos.map(inq => {
-    const key = getPagoKey(inq.empresa, mesFiltro);
-    const pagoDB = pagos[key];
-    return { ...inq, pago: { estado: estadoPagoAutomatico(mesFiltro, pagoDB), ...pagoDB } };
-  });
-
-  const totalMes = pagosDeMes.reduce((s, i) => s + i.renta, 0);
-  const cobradoMes = pagosDeMes.filter(i => i.pago.estado === "pagado").reduce((s, i) => s + (i.pago.monto_base || i.renta), 0);
-
   const inquilinosConDeuda = inquilinos.map(inq => {
-    const mesesDeuda = getMesesDeuda(inq.empresa, pagos);
-    return { ...inq, mesesDeuda, mesOldest: mesesDeuda[0] };
+    const mesesDeuda = getMesesDeuda(inq.empresa, pagos, inq.renta);
+    const mesOldest = mesesDeuda[0];
+    const pagoOldest = mesOldest ? pagos[getPagoKey(inq.empresa, mesOldest)] : null;
+    const saldoOldest = mesOldest ? getSaldoPendiente(pagoOldest, inq.renta) : 0;
+    const totalDeuda = mesesDeuda.reduce((s, mes) => {
+      const p = pagos[getPagoKey(inq.empresa, mes)];
+      return s + getSaldoPendiente(p, inq.renta);
+    }, 0);
+    return { ...inq, mesesDeuda, mesOldest, saldoOldest, totalDeuda };
   });
 
   return (
@@ -267,12 +308,12 @@ export default function CuentasPorCobrar({ naves, pagos }) {
       <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden", marginBottom: 20 }}>
         <div style={{ padding: "14px 20px", borderBottom: "1px solid #1E2740", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0" }}>Estado de cuenta por inquilino</div>
-          <div style={{ fontSize: 12, color: "#3A5070" }}>El pago se aplica al mes mas antiguo automaticamente</div>
+          <div style={{ fontSize: 12, color: "#3A5070" }}>Abonos se aplican al mes mas antiguo</div>
         </div>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#080C14" }}>
-              {["Inquilino", "Mes mas antiguo", "Meses vencidos", "Total adeudo", "Accion"].map(h => (
+              {["Inquilino", "Mes mas antiguo", "Saldo pendiente", "Total adeudo", "Accion"].map(h => (
                 <th key={h} style={{ padding: "10px 16px", fontSize: 11, color: "#3A5070", textAlign: "left", fontWeight: 600, textTransform: "uppercase" }}>{h}</th>
               ))}
             </tr>
@@ -298,11 +339,11 @@ export default function CuentasPorCobrar({ naves, pagos }) {
                     <span style={{ color: "#00C896", fontSize: 12 }}>Al corriente</span>
                   )}
                 </td>
-                <td style={{ padding: "14px 16px", fontSize: 14, fontWeight: 800, color: inq.mesesDeuda.length > 0 ? "#FF5C5C" : "#00C896" }}>
-                  {inq.mesesDeuda.length > 0 ? inq.mesesDeuda.length : "-"}
+                <td style={{ padding: "14px 16px", fontSize: 14, fontWeight: 800, color: inq.saldoOldest > 0 ? "#FFB547" : "#00C896" }}>
+                  {inq.saldoOldest > 0 ? `$${inq.saldoOldest.toLocaleString()}` : "-"}
                 </td>
-                <td style={{ padding: "14px 16px", fontSize: 14, fontWeight: 800, color: inq.mesesDeuda.length > 0 ? "#FF5C5C" : "#00C896" }}>
-                  {inq.mesesDeuda.length > 0 ? `$${(inq.renta * inq.mesesDeuda.length).toLocaleString()}` : "-"}
+                <td style={{ padding: "14px 16px", fontSize: 14, fontWeight: 800, color: inq.totalDeuda > 0 ? "#FF5C5C" : "#00C896" }}>
+                  {inq.totalDeuda > 0 ? `$${inq.totalDeuda.toLocaleString()}` : "-"}
                 </td>
                 <td style={{ padding: "14px 16px" }}>
                   {inq.mesesDeuda.length > 0 ? (
@@ -330,19 +371,6 @@ export default function CuentasPorCobrar({ naves, pagos }) {
         </div>
         <button onClick={() => setMesVisible(Math.min(TODOS_LOS_MESES.length - 4, mesVisible + 1))} disabled={mesVisible >= TODOS_LOS_MESES.length - 4}
           style={{ background: "#0F1520", border: "1px solid #1E2740", borderRadius: 8, color: mesVisible >= TODOS_LOS_MESES.length - 4 ? "#2A3A50" : "#4E8CFF", padding: "8px 14px", cursor: mesVisible >= TODOS_LOS_MESES.length - 4 ? "default" : "pointer", fontSize: 16 }}>▶</button>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
-        {[
-          ["Total a cobrar", `$${totalMes.toLocaleString()}`, "#E8EDF5"],
-          ["Cobrado", `$${cobradoMes.toLocaleString()}`, "#00C896"],
-          ["Pendiente", `$${(totalMes - cobradoMes).toLocaleString()}`, totalMes - cobradoMes > 0 ? "#FF5C5C" : "#00C896"],
-        ].map(([l, v, c], i) => (
-          <div key={i} style={{ background: "#0F1520", borderRadius: 10, padding: "14px 16px", border: "1px solid #1E2740" }}>
-            <div style={{ fontSize: 11, color: "#4E6080", marginBottom: 6 }}>{l}</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: c }}>{v}</div>
-          </div>
-        ))}
       </div>
     </div>
   );

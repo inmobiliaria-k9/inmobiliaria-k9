@@ -18,23 +18,20 @@ function getInquilinos(naves, inmuebles) {
   );
 }
 
-const cellStyle = (estado) => {
-  const colores = {
-    pagado:   { bg: "#0D2E1F", color: "#00C896" },
-    pendiente:{ bg: "#2A2000", color: "#FFB547" },
-    vencido:  { bg: "#2E0D0D", color: "#FF5C5C" },
-    futuro:   { bg: "transparent", color: "#2A3A50" },
-  };
-  return colores[estado] || colores.futuro;
+const cellConfig = {
+  pagado:   { bg: "#0D2E1F", color: "#00C896", simbolo: "v" },
+  parcial:  { bg: "#0D1A2E", color: "#4E8CFF", simbolo: "$" },
+  pendiente:{ bg: "#2A2000", color: "#FFB547", simbolo: "!" },
+  vencido:  { bg: "#2E0D0D", color: "#FF5C5C", simbolo: "x" },
+  futuro:   { bg: "transparent", color: "#2A3A50", simbolo: "-" },
 };
-
-const simbolo = { pagado: "v", pendiente: "!", vencido: "x", futuro: "-" };
 
 const leyenda = [
   { s: "v", bg: "#0D2E1F", c: "#00C896", l: "Pagado" },
+  { s: "$", bg: "#0D1A2E", c: "#4E8CFF", l: "Abono parcial" },
   { s: "!", bg: "#2A2000", c: "#FFB547", l: "Pendiente" },
-  { s: "x", bg: "#2E0D0D", c: "#FF5C5C", l: "Vencido (clic para pagar)" },
-  { s: "-", bg: "transparent", c: "#2A3A50", l: "Mes futuro" },
+  { s: "x", bg: "#2E0D0D", c: "#FF5C5C", l: "Vencido" },
+  { s: "-", bg: "transparent", c: "#2A3A50", l: "Futuro" },
 ];
 
 export default function ResumenAnual({ naves, pagos }) {
@@ -49,8 +46,7 @@ export default function ResumenAnual({ naves, pagos }) {
 
   const inquilinos = getInquilinos(naves, inmuebles);
 
-  const registrarPago = async (empresa, mes) => {
-    const renta = inquilinos.find(i => i.empresa === empresa)?.renta || 0;
+  const registrarPago = async (empresa, mes, renta) => {
     const key = getPagoKey(empresa, mes);
     const fechaHoy = new Date().toISOString().split("T")[0];
     await setDoc(doc(db, "pagos", key), {
@@ -63,13 +59,13 @@ export default function ResumenAnual({ naves, pagos }) {
     <div style={{ padding: "28px" }}>
       <div style={{ fontSize: 20, fontWeight: 800, color: "#E8EDF5", marginBottom: 6 }}>Resumen Anual de Pagos</div>
       <div style={{ fontSize: 12, color: "#3A5070", marginBottom: 20 }}>
-        Mes actual: <span style={{ color: "#4E8CFF", fontWeight: 600 }}>{MES_ACTUAL}</span> · Haz clic en x o ! para registrar pago
+        Mes actual: <span style={{ color: "#4E8CFF", fontWeight: 600 }}>{MES_ACTUAL}</span>
       </div>
 
       {inquilinos.length === 0 ? (
         <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", padding: "60px", textAlign: "center", color: "#3A5070" }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
-          <div>No hay inquilinos registrados aún</div>
+          <div>No hay inquilinos registrados aun</div>
         </div>
       ) : (
         <div style={{ overflowX: "auto" }}>
@@ -99,17 +95,20 @@ export default function ResumenAnual({ naves, pagos }) {
                     {TODOS_LOS_MESES.map(mes => {
                       const key = getPagoKey(inq.empresa, mes);
                       const pagoDB = pagos[key];
-                      const estado = estadoPagoAutomatico(mes, pagoDB);
+                      const estado = estadoPagoAutomatico(mes, pagoDB, inq.renta);
                       if (estado === "vencido") mesesVencidos++;
-                      const c = cellStyle(estado);
-                      const puedeRegistrar = estado === "vencido" || estado === "pendiente";
+                      const c = cellConfig[estado] || cellConfig.futuro;
+                      const puedeRegistrar = estado === "vencido" || estado === "pendiente" || estado === "parcial";
+                      const tooltip = estado === "parcial" && pagoDB?.monto_base
+                        ? `Abonado: $${Number(pagoDB.monto_base).toLocaleString()} de $${inq.renta.toLocaleString()}`
+                        : puedeRegistrar ? "Clic para marcar como pagado" : "";
                       return (
                         <td key={mes} style={{ padding: "8px 4px", textAlign: "center", borderLeft: mes === MES_ACTUAL ? "1px solid #4E8CFF44" : "none" }}>
                           <span
-                            onClick={() => puedeRegistrar && registrarPago(inq.empresa, mes)}
+                            onClick={() => puedeRegistrar && registrarPago(inq.empresa, mes, inq.renta)}
                             style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 24, borderRadius: 4, fontSize: 12, fontWeight: 700, background: c.bg, color: c.color, cursor: puedeRegistrar ? "pointer" : "default" }}
-                            title={puedeRegistrar ? "Clic para marcar como pagado" : ""}>
-                            {simbolo[estado]}
+                            title={tooltip}>
+                            {c.simbolo}
                           </span>
                         </td>
                       );
