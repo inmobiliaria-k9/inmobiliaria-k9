@@ -6,6 +6,8 @@ import {
 } from "./utils";
 import { Badge } from "./Badge";
 
+const CUENTA_EFECTIVO = { id: "efectivo", nombre: "Efectivo", banco: "Caja general", propietario: "General" };
+
 function getInquilinos(naves, inmuebles) {
   return Object.values(
     inmuebles.flatMap(inm =>
@@ -32,7 +34,7 @@ function getMesesDeuda(empresa, pagos) {
 
 function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
   const fechaHoy = new Date().toISOString().split("T")[0];
-  const [cuentas, setCuentas] = useState([]);
+  const [cuentas, setCuentas] = useState([CUENTA_EFECTIVO]);
   const [form, setForm] = useState({
     fecha: fechaHoy, metodo: "Transferencia",
     cuenta_id: "", cuenta_nombre: "", notas: "",
@@ -49,7 +51,7 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
   useEffect(() => {
     const cargarCuentas = async () => {
       const snap = await getDocs(collection(db, "propietarios"));
-      const lista = [];
+      const lista = [CUENTA_EFECTIVO];
       snap.docs.forEach(d => {
         const p = d.data();
         (p.cuentas || []).forEach((c, i) => {
@@ -57,14 +59,22 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
         });
       });
       setCuentas(lista);
-      if (lista.length > 0) { set("cuenta_id", lista[0].id); set("cuenta_nombre", `${lista[0].nombre} — ${lista[0].banco}`); }
+      set("cuenta_id", lista[0].id);
+      set("cuenta_nombre", `${lista[0].nombre} — ${lista[0].banco}`);
     };
     cargarCuentas();
   }, []);
 
   const seleccionarCuenta = (id) => {
     const c = cuentas.find(c => c.id === id);
-    if (c) { set("cuenta_id", id); set("cuenta_nombre", `${c.nombre} — ${c.banco}`); }
+    if (c) {
+      set("cuenta_id", id);
+      set("cuenta_nombre", `${c.nombre} — ${c.banco}`);
+      // Si es efectivo, desactivar IVA y retenciones automáticamente
+      if (id === "efectivo") {
+        setForm(f => ({ ...f, cuenta_id: id, cuenta_nombre: `${c.nombre} — ${c.banco}`, aplica_iva: false, aplica_ret_iva: false, aplica_ret_isr: false }));
+      }
+    }
   };
 
   const iva = form.aplica_iva ? monto * (form.pct_iva / 100) : 0;
@@ -86,20 +96,20 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
       <div style={{ background: "#0F1520", borderRadius: 16, border: "1px solid #1E2740", width: "100%", maxWidth: 480, margin: "auto" }}>
         <div style={{ padding: "20px 24px", borderBottom: "1px solid #1E2740", display: "flex", justifyContent: "space-between" }}>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#E8EDF5" }}>✅ Registrar pago</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#E8EDF5" }}>Registrar pago</div>
             <div style={{ fontSize: 12, color: "#4E6080", marginTop: 2 }}>{inquilino.empresa}</div>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#4E6080", cursor: "pointer", fontSize: 20 }}>✕</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#4E6080", cursor: "pointer", fontSize: 20 }}>x</button>
         </div>
 
         <div style={{ padding: "20px 24px" }}>
           <div style={{ background: "#0A0E17", borderRadius: 10, border: "1px solid #1E2740", padding: "12px 14px", marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: "#4E6080", marginBottom: 8, fontWeight: 600 }}>DEUDA PENDIENTE</div>
             {mesesDeuda.length === 0 ? (
-              <div style={{ fontSize: 13, color: "#00C896" }}>✓ Al corriente</div>
+              <div style={{ fontSize: 13, color: "#00C896" }}>Al corriente</div>
             ) : mesesDeuda.map((mes, i) => (
               <div key={mes} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: i < mesesDeuda.length - 1 ? "1px solid #141A28" : "none" }}>
-                <span style={{ fontSize: 12, color: i === 0 ? "#FFB547" : "#4E6080", fontWeight: i === 0 ? 700 : 400 }}>{i === 0 ? "→ " : ""}{mes}</span>
+                <span style={{ fontSize: 12, color: i === 0 ? "#FFB547" : "#4E6080", fontWeight: i === 0 ? 700 : 400 }}>{i === 0 ? "-> " : ""}{mes}</span>
                 <span style={{ fontSize: 12, color: i === 0 ? "#FF5C5C" : "#3A5070", fontWeight: 700 }}>${inquilino.renta.toLocaleString()}</span>
               </div>
             ))}
@@ -120,31 +130,36 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
                 style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box" }} />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Método de pago</label>
+              <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Metodo de pago</label>
               <select value={form.metodo} onChange={e => set("metodo", e.target.value)}
                 style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none" }}>
-                {["Transferencia", "Efectivo", "Cheque", "Depósito", "Otro"].map(m => <option key={m}>{m}</option>)}
+                {["Transferencia", "Efectivo", "Cheque", "Deposito", "Otro"].map(m => <option key={m}>{m}</option>)}
               </select>
             </div>
           </div>
 
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: "block", fontSize: 12, color: "#00C896", marginBottom: 5, fontWeight: 600 }}>💰 Cuenta bancaria destino</label>
-            {cuentas.length === 0 ? (
-              <div style={{ background: "#2A2000", border: "1px solid #FFB54733", borderRadius: 8, padding: "10px 12px", fontSize: 12, color: "#FFB547" }}>⚠️ No hay cuentas. Agrégalas en Propietarios.</div>
-            ) : (
-              <select value={form.cuenta_id} onChange={e => seleccionarCuenta(e.target.value)}
-                style={{ width: "100%", background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#00C896", outline: "none", fontWeight: 600 }}>
-                {cuentas.map(c => <option key={c.id} value={c.id}>{c.nombre} — {c.banco} ({c.propietario})</option>)}
-              </select>
+            <label style={{ display: "block", fontSize: 12, color: "#00C896", marginBottom: 5, fontWeight: 600 }}>Cuenta destino</label>
+            <select value={form.cuenta_id} onChange={e => seleccionarCuenta(e.target.value)}
+              style={{ width: "100%", background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#00C896", outline: "none", fontWeight: 600 }}>
+              {cuentas.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.id === "efectivo" ? "💵 Efectivo — Caja general" : `${c.nombre} — ${c.banco} (${c.propietario})`}
+                </option>
+              ))}
+            </select>
+            {form.cuenta_id === "efectivo" && (
+              <div style={{ fontSize: 11, color: "#FFB547", marginTop: 6, background: "#2A2000", borderRadius: 6, padding: "6px 10px" }}>
+                Efectivo: IVA y retenciones desactivados automaticamente
+              </div>
             )}
           </div>
 
           <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>Impuestos y retenciones</div>
           {[
             { label: "IVA", sub: "Impuesto al valor agregado", ka: "aplica_iva", kp: "pct_iva" },
-            { label: "Retención IVA", sub: "Retención de IVA", ka: "aplica_ret_iva", kp: "pct_ret_iva" },
-            { label: "Retención ISR", sub: "Retención de ISR", ka: "aplica_ret_isr", kp: "pct_ret_isr" },
+            { label: "Retencion IVA", sub: "Retencion de IVA", ka: "aplica_ret_iva", kp: "pct_ret_iva" },
+            { label: "Retencion ISR", sub: "Retencion de ISR", ka: "aplica_ret_isr", kp: "pct_ret_isr" },
           ].map(({ label, sub, ka, kp }) => (
             <div key={ka} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: form[ka] ? "#0D2E1F" : "#0A0E17", borderRadius: 10, padding: "10px 14px", border: `1px solid ${form[ka] ? "#00C89633" : "#1E2740"}`, marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -163,7 +178,7 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
           ))}
 
           <div style={{ background: "#0A0E17", borderRadius: 10, border: "1px solid #1E2740", padding: "14px", marginTop: 4, marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: "#4E6080", fontWeight: 700, marginBottom: 10 }}>CÁLCULO</div>
+            <div style={{ fontSize: 11, color: "#4E6080", fontWeight: 700, marginBottom: 10 }}>CALCULO</div>
             {[
               ["Renta base", fmt(monto), "#4E6080"],
               form.aplica_iva && [`+ IVA ${form.pct_iva}%`, `+${fmt(iva)}`, "#4E8CFF"],
@@ -177,7 +192,7 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
               </div>
             ))}
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, padding: "8px 0 0", marginTop: 4 }}>
-              <span style={{ color: "#00C896", fontWeight: 700 }}>💰 Entra a tu cuenta</span>
+              <span style={{ color: "#00C896", fontWeight: 700 }}>Entra a tu cuenta</span>
               <span style={{ color: "#00C896", fontWeight: 800 }}>{fmt(montoNeto)}</span>
             </div>
           </div>
@@ -194,7 +209,7 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
               onSave({ mes: mesAplicar, ...form, estado: "pagado", monto: montoNeto, monto_base: monto, iva: Math.round(iva), ret_iva: Math.round(retIva), ret_isr: Math.round(retIsr), total_factura: Math.round(totalFactura) });
               onClose();
             }} style={{ flex: 2, background: "linear-gradient(135deg, #00C896, #4E8CFF)", border: "none", borderRadius: 8, color: "#fff", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-              ✅ Confirmar pago
+              Confirmar pago
             </button>
           </div>
         </div>
@@ -244,7 +259,7 @@ export default function CuentasPorCobrar({ naves, pagos }) {
         <RegistrarPagoModal inquilino={registrando} pagos={pagos} onClose={() => setRegistrando(null)} onSave={(data) => registrarPago(registrando.empresa, data)} />
       )}
 
-      <div style={{ fontSize: 20, fontWeight: 800, color: "#E8EDF5", marginBottom: 6 }}>💳 Cuentas por Cobrar</div>
+      <div style={{ fontSize: 20, fontWeight: 800, color: "#E8EDF5", marginBottom: 6 }}>Cuentas por Cobrar</div>
       <div style={{ fontSize: 12, color: "#3A5070", marginBottom: 20 }}>
         Mes actual: <span style={{ color: "#4E8CFF", fontWeight: 600 }}>{MES_ACTUAL}</span>
       </div>
@@ -252,12 +267,12 @@ export default function CuentasPorCobrar({ naves, pagos }) {
       <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden", marginBottom: 20 }}>
         <div style={{ padding: "14px 20px", borderBottom: "1px solid #1E2740", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0" }}>Estado de cuenta por inquilino</div>
-          <div style={{ fontSize: 12, color: "#3A5070" }}>El pago se aplica al mes más antiguo automáticamente</div>
+          <div style={{ fontSize: 12, color: "#3A5070" }}>El pago se aplica al mes mas antiguo automaticamente</div>
         </div>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#080C14" }}>
-              {["Inquilino", "Mes más antiguo", "Meses vencidos", "Total adeudo", "Acción"].map(h => (
+              {["Inquilino", "Mes mas antiguo", "Meses vencidos", "Total adeudo", "Accion"].map(h => (
                 <th key={h} style={{ padding: "10px 16px", fontSize: 11, color: "#3A5070", textAlign: "left", fontWeight: 600, textTransform: "uppercase" }}>{h}</th>
               ))}
             </tr>
@@ -280,22 +295,22 @@ export default function CuentasPorCobrar({ naves, pagos }) {
                   {inq.mesOldest ? (
                     <span style={{ background: "#2E0D0D", color: "#FF5C5C", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600 }}>{inq.mesOldest}</span>
                   ) : (
-                    <span style={{ color: "#00C896", fontSize: 12 }}>✓ Al corriente</span>
+                    <span style={{ color: "#00C896", fontSize: 12 }}>Al corriente</span>
                   )}
                 </td>
                 <td style={{ padding: "14px 16px", fontSize: 14, fontWeight: 800, color: inq.mesesDeuda.length > 0 ? "#FF5C5C" : "#00C896" }}>
-                  {inq.mesesDeuda.length > 0 ? inq.mesesDeuda.length : "—"}
+                  {inq.mesesDeuda.length > 0 ? inq.mesesDeuda.length : "-"}
                 </td>
                 <td style={{ padding: "14px 16px", fontSize: 14, fontWeight: 800, color: inq.mesesDeuda.length > 0 ? "#FF5C5C" : "#00C896" }}>
-                  {inq.mesesDeuda.length > 0 ? `$${(inq.renta * inq.mesesDeuda.length).toLocaleString()}` : "—"}
+                  {inq.mesesDeuda.length > 0 ? `$${(inq.renta * inq.mesesDeuda.length).toLocaleString()}` : "-"}
                 </td>
                 <td style={{ padding: "14px 16px" }}>
                   {inq.mesesDeuda.length > 0 ? (
                     <button onClick={() => setRegistrando(inq)} style={{ background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 8, color: "#00C896", padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                      ✅ Registrar pago
+                      Registrar pago
                     </button>
                   ) : (
-                    <span style={{ fontSize: 12, color: "#3A5070" }}>Al corriente ✓</span>
+                    <span style={{ fontSize: 12, color: "#3A5070" }}>Al corriente</span>
                   )}
                 </td>
               </tr>
