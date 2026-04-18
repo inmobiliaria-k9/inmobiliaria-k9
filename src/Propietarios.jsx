@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from "firebase/firestore";
-import { inmuebles } from "./utils";
 
 function Modal({ titulo, onClose, children }) {
   return (
@@ -18,7 +17,7 @@ function Modal({ titulo, onClose, children }) {
   );
 }
 
-function FormPropietario({ inicial, onGuardar, onCancelar }) {
+function FormPropietario({ inicial, inmuebles, onGuardar, onCancelar }) {
   const empty = { nombre: "", cuentas: [{ nombre: "", banco: "", numero: "" }], inmuebles_ids: [] };
   const [form, setForm] = useState(inicial || empty);
 
@@ -38,7 +37,7 @@ function FormPropietario({ inicial, onGuardar, onCancelar }) {
     setForm(f => ({ ...f, inmuebles_ids: ids }));
   };
 
-  const input = (label, valor, onChange, placeholder = "") => (
+  const inp = (label, valor, onChange, placeholder = "") => (
     <div style={{ marginBottom: 12 }}>
       <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>{label}</label>
       <input value={valor} onChange={e => onChange(e.target.value)} placeholder={placeholder}
@@ -48,18 +47,22 @@ function FormPropietario({ inicial, onGuardar, onCancelar }) {
 
   return (
     <div>
-      {input("Nombre del propietario *", form.nombre, v => setForm(f => ({ ...f, nombre: v })), "Ej. Grupo Hernández")}
+      {inp("Nombre del propietario *", form.nombre, v => setForm(f => ({ ...f, nombre: v })), "Ej. Grupo Hernández")}
 
       <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 600, marginBottom: 8, marginTop: 4 }}>INMUEBLES ASIGNADOS</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-        {inmuebles.map(inm => (
-          <div key={inm.id} onClick={() => toggleInmueble(inm.id)}
-            style={{ padding: "10px 12px", borderRadius: 8, border: `1px solid ${form.inmuebles_ids.includes(inm.id) ? "#00C896" : "#1E2740"}`, background: form.inmuebles_ids.includes(inm.id) ? "#0D2E1F" : "#0A0E17", cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 16 }}>🏭</span>
-            <span style={{ fontSize: 12, color: form.inmuebles_ids.includes(inm.id) ? "#00C896" : "#4E6080", fontWeight: form.inmuebles_ids.includes(inm.id) ? 600 : 400 }}>{inm.nombre}</span>
-          </div>
-        ))}
-      </div>
+      {inmuebles.length === 0 ? (
+        <div style={{ fontSize: 12, color: "#3A5070", marginBottom: 16 }}>No hay inmuebles registrados aún.</div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+          {inmuebles.map(inm => (
+            <div key={inm.id} onClick={() => toggleInmueble(inm.id)}
+              style={{ padding: "10px 12px", borderRadius: 8, border: `1px solid ${form.inmuebles_ids.includes(inm.id) ? "#00C896" : "#1E2740"}`, background: form.inmuebles_ids.includes(inm.id) ? "#0D2E1F" : "#0A0E17", cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 16 }}>🏭</span>
+              <span style={{ fontSize: 12, color: form.inmuebles_ids.includes(inm.id) ? "#00C896" : "#4E6080", fontWeight: form.inmuebles_ids.includes(inm.id) ? 600 : 400 }}>{inm.nombre}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 600 }}>CUENTAS BANCARIAS</div>
@@ -106,15 +109,19 @@ function FormPropietario({ inicial, onGuardar, onCancelar }) {
 
 export default function Propietarios() {
   const [propietarios, setPropietarios] = useState([]);
+  const [inmuebles, setInmuebles] = useState([]);
   const [modalNuevo, setModalNuevo] = useState(false);
   const [editando, setEditando] = useState(null);
   const [confirmBorrar, setConfirmBorrar] = useState(null);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "propietarios"), snap => {
+    const unsubProp = onSnapshot(collection(db, "propietarios"), snap => {
       setPropietarios(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    return () => unsub();
+    const unsubInm = onSnapshot(collection(db, "inmuebles"), snap => {
+      setInmuebles(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => { unsubProp(); unsubInm(); };
   }, []);
 
   const agregar = async (form) => {
@@ -137,22 +144,22 @@ export default function Propietarios() {
     <div style={{ padding: "28px" }}>
       {modalNuevo && (
         <Modal titulo="➕ Nuevo propietario" onClose={() => setModalNuevo(false)}>
-          <FormPropietario onGuardar={agregar} onCancelar={() => setModalNuevo(false)} />
+          <FormPropietario inmuebles={inmuebles} onGuardar={agregar} onCancelar={() => setModalNuevo(false)} />
         </Modal>
       )}
       {editando && (
         <Modal titulo="✏️ Editar propietario" onClose={() => setEditando(null)}>
-          <FormPropietario inicial={editando} onGuardar={actualizar} onCancelar={() => setEditando(null)} />
+          <FormPropietario inicial={editando} inmuebles={inmuebles} onGuardar={actualizar} onCancelar={() => setEditando(null)} />
         </Modal>
       )}
       {confirmBorrar && (
-        <Modal titulo="⚠️ Confirmar" onClose={() => setConfirmBorrar(null)}>
+        <Modal titulo="Confirmar" onClose={() => setConfirmBorrar(null)}>
           <div style={{ fontSize: 14, color: "#C8D8F0", marginBottom: 20 }}>
-            ¿Seguro que quieres borrar a <strong>{confirmBorrar.nombre}</strong>?
+            Seguro que quieres borrar a <strong>{confirmBorrar.nombre}</strong>?
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => setConfirmBorrar(null)} style={{ flex: 1, background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#4E6080", padding: 11, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
-            <button onClick={() => borrar(confirmBorrar.id)} style={{ flex: 1, background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 8, color: "#FF5C5C", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Sí, borrar</button>
+            <button onClick={() => borrar(confirmBorrar.id)} style={{ flex: 1, background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 8, color: "#FF5C5C", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Si, borrar</button>
           </div>
         </Modal>
       )}
@@ -163,7 +170,7 @@ export default function Propietarios() {
           <div style={{ fontSize: 12, color: "#3A5070", marginTop: 2 }}>{propietarios.length} propietario{propietarios.length !== 1 ? "s" : ""} registrado{propietarios.length !== 1 ? "s" : ""}</div>
         </div>
         <button onClick={() => setModalNuevo(true)} style={{ background: "linear-gradient(135deg, #00C896, #4E8CFF)", border: "none", borderRadius: 8, color: "#fff", padding: "10px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-          ➕ Nuevo propietario
+          + Nuevo propietario
         </button>
       </div>
 
@@ -188,8 +195,8 @@ export default function Propietarios() {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => setEditando(p)} style={{ background: "#1A2535", border: "1px solid #1E2740", borderRadius: 6, color: "#4E8CFF", padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>✏️</button>
-                  <button onClick={() => setConfirmBorrar(p)} style={{ background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 6, color: "#FF5C5C", padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>🗑️</button>
+                  <button onClick={() => setEditando(p)} style={{ background: "#1A2535", border: "1px solid #1E2740", borderRadius: 6, color: "#4E8CFF", padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>Editar</button>
+                  <button onClick={() => setConfirmBorrar(p)} style={{ background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 6, color: "#FF5C5C", padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>Borrar</button>
                 </div>
               </div>
 
