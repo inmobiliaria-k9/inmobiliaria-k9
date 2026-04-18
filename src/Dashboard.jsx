@@ -1,11 +1,7 @@
-import { MESES_NOMBRES, MES_ACTUAL, getPagoKey } from "./utils";
-
-const inmuebles = [
-  { id: 1, nombre: "PARQUE JINT" },
-  { id: 2, nombre: "JAGÜEY" },
-  { id: 3, nombre: "PARQUE SAN LORENZO" },
-  { id: 4, nombre: "AV 15 DE MAYO" },
-];
+import { useState, useEffect } from "react";
+import { db } from "./firebase";
+import { collection, onSnapshot } from "firebase/firestore";
+import { MES_ACTUAL, getPagoKey } from "./utils";
 
 function calcularEstado(nave) {
   if (nave.mantenimiento) return "mantenimiento";
@@ -14,6 +10,15 @@ function calcularEstado(nave) {
 }
 
 export default function Dashboard({ naves, pagos }) {
+  const [inmuebles, setInmuebles] = useState([]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "inmuebles"), snap => {
+      setInmuebles(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, []);
+
   const rentadas = naves.filter(n => calcularEstado(n) === "rentada").length;
   const rentaTotal = naves.reduce((s, n) => s + Number(n.renta), 0);
   const inquilinos = [...new Set(naves.filter(n => n.inquilino).map(n => n.inquilino))];
@@ -47,19 +52,25 @@ export default function Dashboard({ naves, pagos }) {
 
       <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", padding: "20px" }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 16 }}>🏭 Inmuebles</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
-          {inmuebles.map(inm => {
-            const navesInm = naves.filter(n => n.inmueble_id === inm.id);
-            const rentadasInm = navesInm.filter(n => calcularEstado(n) === "rentada").length;
-            return (
-              <div key={inm.id} style={{ background: "#0A0E17", borderRadius: 10, padding: "14px", border: "1px solid #1E2740" }}>
-                <div style={{ fontSize: 20, marginBottom: 6 }}>🏭</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#C8D8F0", marginBottom: 4 }}>{inm.nombre}</div>
-                <div style={{ fontSize: 12, color: "#3A5070" }}>{navesInm.length} naves · {rentadasInm} rentadas</div>
-              </div>
-            );
-          })}
-        </div>
+        {inmuebles.length === 0 ? (
+          <div style={{ color: "#3A5070", fontSize: 13 }}>Cargando inmuebles...</div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+            {inmuebles.map(inm => {
+              const navesInm = naves.filter(n => n.inmueble_id === inm.id);
+              const rentadasInm = navesInm.filter(n => calcularEstado(n) === "rentada").length;
+              const rentaInm = navesInm.reduce((s, n) => s + Number(n.renta), 0);
+              return (
+                <div key={inm.id} style={{ background: "#0A0E17", borderRadius: 10, padding: "14px", border: "1px solid #1E2740" }}>
+                  <div style={{ fontSize: 20, marginBottom: 6 }}>🏭</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#C8D8F0", marginBottom: 4 }}>{inm.nombre}</div>
+                  <div style={{ fontSize: 12, color: "#3A5070" }}>{navesInm.length} naves · {rentadasInm} rentadas</div>
+                  {rentaInm > 0 && <div style={{ fontSize: 12, color: "#00C896", marginTop: 4 }}>${rentaInm.toLocaleString()}/mes</div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
