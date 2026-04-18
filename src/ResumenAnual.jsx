@@ -1,11 +1,9 @@
+import { useState, useEffect } from "react";
 import { db } from "./firebase";
-import { doc, setDoc } from "firebase/firestore";
-import {
-  MES_ACTUAL, TODOS_LOS_MESES, estadoPagoAutomatico,
-  getPagoKey, inmuebles
-} from "./utils";
+import { collection, onSnapshot, doc, setDoc } from "firebase/firestore";
+import { MES_ACTUAL, TODOS_LOS_MESES, estadoPagoAutomatico, getPagoKey } from "./utils";
 
-function getInquilinos(naves) {
+function getInquilinos(naves, inmuebles) {
   return Object.values(
     inmuebles.flatMap(inm =>
       naves.filter(n => n.inmueble_id === inm.id && n.inquilino && n.inquilino.trim() !== "" && Number(n.renta) > 0)
@@ -30,10 +28,26 @@ const cellStyle = (estado) => {
   return colores[estado] || colores.futuro;
 };
 
-const simbolo = { pagado: "✓", pendiente: "!", vencido: "✗", futuro: "—" };
+const simbolo = { pagado: "v", pendiente: "!", vencido: "x", futuro: "-" };
+
+const leyenda = [
+  { s: "v", bg: "#0D2E1F", c: "#00C896", l: "Pagado" },
+  { s: "!", bg: "#2A2000", c: "#FFB547", l: "Pendiente" },
+  { s: "x", bg: "#2E0D0D", c: "#FF5C5C", l: "Vencido (clic para pagar)" },
+  { s: "-", bg: "transparent", c: "#2A3A50", l: "Mes futuro" },
+];
 
 export default function ResumenAnual({ naves, pagos }) {
-  const inquilinos = getInquilinos(naves);
+  const [inmuebles, setInmuebles] = useState([]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "inmuebles"), snap => {
+      setInmuebles(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, []);
+
+  const inquilinos = getInquilinos(naves, inmuebles);
 
   const registrarPago = async (empresa, mes) => {
     const renta = inquilinos.find(i => i.empresa === empresa)?.renta || 0;
@@ -41,15 +55,15 @@ export default function ResumenAnual({ naves, pagos }) {
     const fechaHoy = new Date().toISOString().split("T")[0];
     await setDoc(doc(db, "pagos", key), {
       empresa, mes, estado: "pagado",
-      fecha: fechaHoy, monto: renta, metodo: "Transferencia"
+      fecha: fechaHoy, monto: renta, monto_base: renta, metodo: "Transferencia"
     });
   };
 
   return (
     <div style={{ padding: "28px" }}>
-      <div style={{ fontSize: 20, fontWeight: 800, color: "#E8EDF5", marginBottom: 6 }}>📊 Resumen Anual de Pagos</div>
+      <div style={{ fontSize: 20, fontWeight: 800, color: "#E8EDF5", marginBottom: 6 }}>Resumen Anual de Pagos</div>
       <div style={{ fontSize: 12, color: "#3A5070", marginBottom: 20 }}>
-        Mes actual: <span style={{ color: "#4E8CFF", fontWeight: 600 }}>{MES_ACTUAL}</span> · Haz clic en ✗ o ! para registrar pago
+        Mes actual: <span style={{ color: "#4E8CFF", fontWeight: 600 }}>{MES_ACTUAL}</span> · Haz clic en x o ! para registrar pago
       </div>
 
       {inquilinos.length === 0 ? (
@@ -116,10 +130,10 @@ export default function ResumenAnual({ naves, pagos }) {
       )}
 
       <div style={{ display: "flex", gap: 16, marginTop: 16, fontSize: 12, color: "#4E6080", flexWrap: "wrap" }}>
-        {[["✓","#0D2E1F","#00C896","Pagado"],["!","#2A2000","#FFB547","Pendiente (mes actual)"],["✗","#2E0D0D","#FF5C5C","Vencido (clic para pagar)"],["—","transparent","#2A3A50","Mes futuro"]].map(([s,bg,c,l]) => (
-          <span key={l} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 18, borderRadius: 3, fontSize: 11, fontWeight: 700, background: bg, color: c }}>{s}</span>
-            {l}
+        {leyenda.map(item => (
+          <span key={item.l} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 18, borderRadius: 3, fontSize: 11, fontWeight: 700, background: item.bg, color: item.c }}>{item.s}</span>
+            {item.l}
           </span>
         ))}
       </div>

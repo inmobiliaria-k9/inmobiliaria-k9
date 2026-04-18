@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
-import { doc, setDoc, collection, getDocs } from "firebase/firestore";
+import { doc, setDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
 import {
-  MES_ACTUAL, TODOS_LOS_MESES, estadoPagoAutomatico,
-  getPagoKey, inmuebles
+  MES_ACTUAL, TODOS_LOS_MESES, estadoPagoAutomatico, getPagoKey
 } from "./utils";
 import { Badge } from "./Badge";
 
-function getInquilinos(naves) {
+function getInquilinos(naves, inmuebles) {
   return Object.values(
     inmuebles.flatMap(inm =>
       naves.filter(n => n.inmueble_id === inm.id && n.inquilino && n.inquilino.trim() !== "" && Number(n.renta) > 0)
@@ -22,7 +21,6 @@ function getInquilinos(naves) {
   );
 }
 
-// Obtiene los meses con deuda pendiente o vencida de un inquilino
 function getMesesDeuda(empresa, pagos) {
   return TODOS_LOS_MESES.filter(mes => {
     const key = getPagoKey(empresa, mes);
@@ -36,21 +34,14 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
   const fechaHoy = new Date().toISOString().split("T")[0];
   const [cuentas, setCuentas] = useState([]);
   const [form, setForm] = useState({
-    fecha: fechaHoy,
-    metodo: "Transferencia",
-    cuenta_id: "",
-    cuenta_nombre: "",
-    notas: "",
-    aplica_iva: true,
-    pct_iva: 16,
-    aplica_ret_iva: true,
-    pct_ret_iva: 10.67,
-    aplica_ret_isr: true,
-    pct_ret_isr: 10,
+    fecha: fechaHoy, metodo: "Transferencia",
+    cuenta_id: "", cuenta_nombre: "", notas: "",
+    aplica_iva: true, pct_iva: 16,
+    aplica_ret_iva: true, pct_ret_iva: 10.67,
+    aplica_ret_isr: true, pct_ret_isr: 10,
   });
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
   const mesesDeuda = getMesesDeuda(inquilino.empresa, pagos);
   const mesAplicar = mesesDeuda[0] || MES_ACTUAL;
   const monto = inquilino.renta;
@@ -66,10 +57,7 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
         });
       });
       setCuentas(lista);
-      if (lista.length > 0) {
-        set("cuenta_id", lista[0].id);
-        set("cuenta_nombre", `${lista[0].nombre} — ${lista[0].banco}`);
-      }
+      if (lista.length > 0) { set("cuenta_id", lista[0].id); set("cuenta_nombre", `${lista[0].nombre} — ${lista[0].banco}`); }
     };
     cargarCuentas();
   }, []);
@@ -105,25 +93,18 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
         </div>
 
         <div style={{ padding: "20px 24px" }}>
-
-          {/* Deuda pendiente */}
           <div style={{ background: "#0A0E17", borderRadius: 10, border: "1px solid #1E2740", padding: "12px 14px", marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: "#4E6080", marginBottom: 8, fontWeight: 600 }}>DEUDA PENDIENTE</div>
             {mesesDeuda.length === 0 ? (
               <div style={{ fontSize: 13, color: "#00C896" }}>✓ Al corriente</div>
-            ) : (
-              mesesDeuda.map((mes, i) => (
-                <div key={mes} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: i < mesesDeuda.length - 1 ? "1px solid #141A28" : "none" }}>
-                  <span style={{ fontSize: 12, color: i === 0 ? "#FFB547" : "#4E6080", fontWeight: i === 0 ? 700 : 400 }}>
-                    {i === 0 ? "→ " : ""}{mes}
-                  </span>
-                  <span style={{ fontSize: 12, color: i === 0 ? "#FF5C5C" : "#3A5070", fontWeight: 700 }}>${inquilino.renta.toLocaleString()}</span>
-                </div>
-              ))
-            )}
+            ) : mesesDeuda.map((mes, i) => (
+              <div key={mes} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: i < mesesDeuda.length - 1 ? "1px solid #141A28" : "none" }}>
+                <span style={{ fontSize: 12, color: i === 0 ? "#FFB547" : "#4E6080", fontWeight: i === 0 ? 700 : 400 }}>{i === 0 ? "→ " : ""}{mes}</span>
+                <span style={{ fontSize: 12, color: i === 0 ? "#FF5C5C" : "#3A5070", fontWeight: 700 }}>${inquilino.renta.toLocaleString()}</span>
+              </div>
+            ))}
           </div>
 
-          {/* Mes que se va a pagar */}
           <div style={{ background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 10, padding: "10px 14px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
               <div style={{ fontSize: 11, color: "#00C896", fontWeight: 600, marginBottom: 2 }}>APLICANDO PAGO A</div>
@@ -132,7 +113,6 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
             <div style={{ fontSize: 16, fontWeight: 800, color: "#00C896" }}>${monto.toLocaleString()}</div>
           </div>
 
-          {/* Fecha y método */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
             <div>
               <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Fecha de pago</label>
@@ -148,13 +128,10 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
             </div>
           </div>
 
-          {/* Cuenta bancaria */}
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: "block", fontSize: 12, color: "#00C896", marginBottom: 5, fontWeight: 600 }}>💰 Cuenta bancaria destino</label>
             {cuentas.length === 0 ? (
-              <div style={{ background: "#2A2000", border: "1px solid #FFB54733", borderRadius: 8, padding: "10px 12px", fontSize: 12, color: "#FFB547" }}>
-                ⚠️ No hay cuentas. Agrégalas en Propietarios.
-              </div>
+              <div style={{ background: "#2A2000", border: "1px solid #FFB54733", borderRadius: 8, padding: "10px 12px", fontSize: 12, color: "#FFB547" }}>⚠️ No hay cuentas. Agrégalas en Propietarios.</div>
             ) : (
               <select value={form.cuenta_id} onChange={e => seleccionarCuenta(e.target.value)}
                 style={{ width: "100%", background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#00C896", outline: "none", fontWeight: 600 }}>
@@ -163,31 +140,28 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
             )}
           </div>
 
-          {/* IVA y retenciones */}
           <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>Impuestos y retenciones</div>
-
           {[
-            { label: "IVA", sub: "Impuesto al valor agregado", key_activo: "aplica_iva", key_pct: "pct_iva" },
-            { label: "Retención IVA", sub: "Retención de IVA", key_activo: "aplica_ret_iva", key_pct: "pct_ret_iva" },
-            { label: "Retención ISR", sub: "Retención de ISR", key_activo: "aplica_ret_isr", key_pct: "pct_ret_isr" },
-          ].map(({ label, sub, key_activo, key_pct }) => (
-            <div key={key_activo} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: form[key_activo] ? "#0D2E1F" : "#0A0E17", borderRadius: 10, padding: "10px 14px", border: `1px solid ${form[key_activo] ? "#00C89633" : "#1E2740"}`, marginBottom: 8 }}>
+            { label: "IVA", sub: "Impuesto al valor agregado", ka: "aplica_iva", kp: "pct_iva" },
+            { label: "Retención IVA", sub: "Retención de IVA", ka: "aplica_ret_iva", kp: "pct_ret_iva" },
+            { label: "Retención ISR", sub: "Retención de ISR", ka: "aplica_ret_isr", kp: "pct_ret_isr" },
+          ].map(({ label, sub, ka, kp }) => (
+            <div key={ka} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: form[ka] ? "#0D2E1F" : "#0A0E17", borderRadius: 10, padding: "10px 14px", border: `1px solid ${form[ka] ? "#00C89633" : "#1E2740"}`, marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <Toggle activo={form[key_activo]} onChange={() => set(key_activo, !form[key_activo])} />
+                <Toggle activo={form[ka]} onChange={() => set(ka, !form[ka])} />
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "#E8EDF5" }}>{label}</div>
                   <div style={{ fontSize: 11, color: "#3A5070" }}>{sub}</div>
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <input value={form[key_pct]} onChange={e => set(key_pct, e.target.value)} type="number" disabled={!form[key_activo]}
-                  style={{ width: 60, background: "#0A0E17", border: `1px solid ${form[key_activo] ? "#00C89633" : "#1E2740"}`, borderRadius: 6, padding: "5px 8px", fontSize: 13, color: form[key_activo] ? "#00C896" : "#3A5070", textAlign: "right", outline: "none" }} />
-                <span style={{ fontSize: 13, color: form[key_activo] ? "#00C896" : "#3A5070", fontWeight: 600 }}>%</span>
+                <input value={form[kp]} onChange={e => set(kp, e.target.value)} type="number" disabled={!form[ka]}
+                  style={{ width: 60, background: "#0A0E17", border: `1px solid ${form[ka] ? "#00C89633" : "#1E2740"}`, borderRadius: 6, padding: "5px 8px", fontSize: 13, color: form[ka] ? "#00C896" : "#3A5070", textAlign: "right", outline: "none" }} />
+                <span style={{ fontSize: 13, color: form[ka] ? "#00C896" : "#3A5070", fontWeight: 600 }}>%</span>
               </div>
             </div>
           ))}
 
-          {/* Cálculo */}
           <div style={{ background: "#0A0E17", borderRadius: 10, border: "1px solid #1E2740", padding: "14px", marginTop: 4, marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: "#4E6080", fontWeight: 700, marginBottom: 10 }}>CÁLCULO</div>
             {[
@@ -208,7 +182,6 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
             </div>
           </div>
 
-          {/* Notas */}
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Notas (opcional)</label>
             <input value={form.notas} onChange={e => set("notas", e.target.value)} placeholder="Referencia, observaciones..."
@@ -218,17 +191,7 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onClose} style={{ flex: 1, background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#4E6080", padding: 11, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
             <button onClick={() => {
-              onSave({
-                mes: mesAplicar,
-                ...form,
-                estado: "pagado",
-                monto: montoNeto,
-                monto_base: monto,
-                iva: Math.round(iva),
-                ret_iva: Math.round(retIva),
-                ret_isr: Math.round(retIsr),
-                total_factura: Math.round(totalFactura),
-              });
+              onSave({ mes: mesAplicar, ...form, estado: "pagado", monto: montoNeto, monto_base: monto, iva: Math.round(iva), ret_iva: Math.round(retIva), ret_isr: Math.round(retIsr), total_factura: Math.round(totalFactura) });
               onClose();
             }} style={{ flex: 2, background: "linear-gradient(135deg, #00C896, #4E8CFF)", border: "none", borderRadius: 8, color: "#fff", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
               ✅ Confirmar pago
@@ -244,9 +207,17 @@ export default function CuentasPorCobrar({ naves, pagos }) {
   const [registrando, setRegistrando] = useState(null);
   const [mesFiltro, setMesFiltro] = useState(MES_ACTUAL);
   const [mesVisible, setMesVisible] = useState(Math.max(0, TODOS_LOS_MESES.length - 4));
+  const [inmuebles, setInmuebles] = useState([]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "inmuebles"), snap => {
+      setInmuebles(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, []);
 
   const mesesVisibles = TODOS_LOS_MESES.slice(mesVisible, mesVisible + 4);
-  const inquilinos = getInquilinos(naves);
+  const inquilinos = getInquilinos(naves, inmuebles);
 
   const registrarPago = async (empresa, data) => {
     const key = getPagoKey(empresa, data.mes);
@@ -262,7 +233,6 @@ export default function CuentasPorCobrar({ naves, pagos }) {
   const totalMes = pagosDeMes.reduce((s, i) => s + i.renta, 0);
   const cobradoMes = pagosDeMes.filter(i => i.pago.estado === "pagado").reduce((s, i) => s + (i.pago.monto_base || i.renta), 0);
 
-  // Inquilinos con deuda más antigua
   const inquilinosConDeuda = inquilinos.map(inq => {
     const mesesDeuda = getMesesDeuda(inq.empresa, pagos);
     return { ...inq, mesesDeuda, mesOldest: mesesDeuda[0] };
@@ -271,12 +241,7 @@ export default function CuentasPorCobrar({ naves, pagos }) {
   return (
     <div style={{ padding: "28px" }}>
       {registrando && (
-        <RegistrarPagoModal
-          inquilino={registrando}
-          pagos={pagos}
-          onClose={() => setRegistrando(null)}
-          onSave={(data) => registrarPago(registrando.empresa, data)}
-        />
+        <RegistrarPagoModal inquilino={registrando} pagos={pagos} onClose={() => setRegistrando(null)} onSave={(data) => registrarPago(registrando.empresa, data)} />
       )}
 
       <div style={{ fontSize: 20, fontWeight: 800, color: "#E8EDF5", marginBottom: 6 }}>💳 Cuentas por Cobrar</div>
@@ -284,7 +249,6 @@ export default function CuentasPorCobrar({ naves, pagos }) {
         Mes actual: <span style={{ color: "#4E8CFF", fontWeight: 600 }}>{MES_ACTUAL}</span>
       </div>
 
-      {/* Resumen de deuda por inquilino */}
       <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden", marginBottom: 20 }}>
         <div style={{ padding: "14px 20px", borderBottom: "1px solid #1E2740", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0" }}>Estado de cuenta por inquilino</div>
@@ -340,7 +304,6 @@ export default function CuentasPorCobrar({ naves, pagos }) {
         </table>
       </div>
 
-      {/* Vista por mes */}
       <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>Vista por mes</div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
         <button onClick={() => setMesVisible(Math.max(0, mesVisible - 1))} disabled={mesVisible === 0}
@@ -354,7 +317,7 @@ export default function CuentasPorCobrar({ naves, pagos }) {
           style={{ background: "#0F1520", border: "1px solid #1E2740", borderRadius: 8, color: mesVisible >= TODOS_LOS_MESES.length - 4 ? "#2A3A50" : "#4E8CFF", padding: "8px 14px", cursor: mesVisible >= TODOS_LOS_MESES.length - 4 ? "default" : "pointer", fontSize: 16 }}>▶</button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
         {[
           ["Total a cobrar", `$${totalMes.toLocaleString()}`, "#E8EDF5"],
           ["Cobrado", `$${cobradoMes.toLocaleString()}`, "#00C896"],
