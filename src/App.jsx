@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, doc, getDocs, setDoc, onSnapshot, addDoc } from "firebase/firestore";
+import { collection, doc, getDocs, setDoc, onSnapshot, addDoc, updateDoc } from "firebase/firestore";
 import { navesIniciales, MES_ACTUAL } from "./utils";
 import Login from "./Login";
 import Dashboard from "./Dashboard";
@@ -44,6 +44,7 @@ export default function App() {
   const [naves, setNaves] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [migrando, setMigrando] = useState(false);
+  const [migrandoInmuebles, setMigrandoInmuebles] = useState(false);
   const pagos = usePagos();
 
   useEffect(() => {
@@ -75,6 +76,33 @@ export default function App() {
     };
     inicializar();
   }, [usuario]);
+
+  // Verifica si hay naves con inmueble_id numérico
+  const navesConIdNumerico = naves.filter(n => typeof n.inmueble_id === "number");
+
+  const migrarInmuebles = async () => {
+    setMigrandoInmuebles(true);
+    try {
+      // Mapa de id numérico a id texto
+      const mapa = { 1: "inm1", 2: "inm2", 3: "inm3", 4: "inm4" };
+      const snap = await getDocs(collection(db, "naves"));
+      let actualizadas = 0;
+      for (const d of snap.docs) {
+        const nave = d.data();
+        if (typeof nave.inmueble_id === "number" && mapa[nave.inmueble_id]) {
+          await updateDoc(doc(db, "naves", d.id), { inmueble_id: mapa[nave.inmueble_id] });
+          actualizadas++;
+        }
+      }
+      // Recargar naves
+      const snap2 = await getDocs(collection(db, "naves"));
+      setNaves(snap2.docs.map(d => ({ id: d.id, ...d.data() })));
+      alert(`✅ ${actualizadas} naves migradas correctamente.`);
+    } catch (e) {
+      alert("Error en la migración.");
+    }
+    setMigrandoInmuebles(false);
+  };
 
   const migrarInquilinos = async () => {
     setMigrando(true);
@@ -143,9 +171,19 @@ export default function App() {
             </button>
           ))}
 
+          {/* Botón migrar naves — solo si hay naves con id numérico */}
+          {navesConIdNumerico.length > 0 && (
+            <button onClick={migrarInmuebles} disabled={migrandoInmuebles}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 8, border: "1px dashed #FFB54744", cursor: migrandoInmuebles ? "default" : "pointer", textAlign: "left", width: "100%", background: "#2A2000", color: "#FFB547", fontSize: 12, fontWeight: 600, marginTop: 8 }}>
+              <span style={{ fontSize: 14 }}>🔄</span>
+              {migrandoInmuebles ? "Migrando..." : "Migrar naves"}
+            </button>
+          )}
+
+          {/* Botón migrar inquilinos */}
           {naves.some(n => n.inquilino && n.inquilino.trim() !== "") && (
             <button onClick={migrarInquilinos} disabled={migrando}
-              style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 8, border: "1px dashed #FFB54744", cursor: migrando ? "default" : "pointer", textAlign: "left", width: "100%", background: "#2A2000", color: "#FFB547", fontSize: 12, fontWeight: 600, marginTop: 8 }}>
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 8, border: "1px dashed #FFB54744", cursor: migrando ? "default" : "pointer", textAlign: "left", width: "100%", background: "#2A2000", color: "#FFB547", fontSize: 12, fontWeight: 600, marginTop: 4 }}>
               <span style={{ fontSize: 14 }}>🔄</span>
               {migrando ? "Migrando..." : "Migrar inquilinos"}
             </button>
