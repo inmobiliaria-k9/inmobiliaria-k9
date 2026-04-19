@@ -11,6 +11,7 @@ import ResumenAnual from "./ResumenAnual";
 import Propietarios from "./Propietarios";
 import Inquilinos from "./Inquilinos";
 import EstadosCuenta from "./EstadosCuenta";
+import Gastos from "./Gastos";
 
 const auth = getAuth();
 
@@ -20,6 +21,7 @@ const navItems = [
   { id: "naves", label: "Inmuebles y Naves", icon: "🏭" },
   { id: "inquilinos", label: "Inquilinos", icon: "👥" },
   { id: "cobrar", label: "Cuentas por Cobrar", icon: "💳" },
+  { id: "gastos", label: "Gastos", icon: "📋" },
   { id: "estados", label: "Estados de Cuenta", icon: "🏦" },
   { id: "resumen", label: "Resumen Anual", icon: "📊" },
 ];
@@ -77,13 +79,11 @@ export default function App() {
     inicializar();
   }, [usuario]);
 
-  // Verifica si hay naves con inmueble_id numérico
   const navesConIdNumerico = naves.filter(n => typeof n.inmueble_id === "number");
 
   const migrarInmuebles = async () => {
     setMigrandoInmuebles(true);
     try {
-      // Mapa de id numérico a id texto
       const mapa = { 1: "inm1", 2: "inm2", 3: "inm3", 4: "inm4" };
       const snap = await getDocs(collection(db, "naves"));
       let actualizadas = 0;
@@ -94,13 +94,10 @@ export default function App() {
           actualizadas++;
         }
       }
-      // Recargar naves
       const snap2 = await getDocs(collection(db, "naves"));
       setNaves(snap2.docs.map(d => ({ id: d.id, ...d.data() })));
-      alert(`✅ ${actualizadas} naves migradas correctamente.`);
-    } catch (e) {
-      alert("Error en la migración.");
-    }
+      alert(`${actualizadas} naves migradas.`);
+    } catch (e) { alert("Error en la migracion."); }
     setMigrandoInmuebles(false);
   };
 
@@ -119,16 +116,13 @@ export default function App() {
         await addDoc(collection(db, "inquilinos"), {
           alias, razon_social: "", rfc: "", contacto: "", telefono: "", correo: "",
           nave_id: nave.id, inmueble_id: nave.inmueble_id,
-          fecha_inicio: "", fecha_fin: "",
-          notas: "Migrado automáticamente desde naves",
+          fecha_inicio: "", fecha_fin: "", notas: "Migrado automaticamente",
         });
         creados++;
       }
-      alert(`✅ ${creados} inquilino${creados !== 1 ? "s" : ""} creado${creados !== 1 ? "s" : ""}.`);
+      alert(`${creados} inquilinos creados.`);
       setActive("inquilinos");
-    } catch (e) {
-      alert("Error en la migración.");
-    }
+    } catch (e) { alert("Error en la migracion."); }
     setMigrando(false);
   };
 
@@ -140,7 +134,7 @@ export default function App() {
 
   if (verificando) return (
     <div style={{ minHeight: "100vh", background: "#0A0E17", display: "flex", alignItems: "center", justifyContent: "center", color: "#4E8CFF", fontSize: 16, fontFamily: "sans-serif" }}>
-      🔄 Verificando sesión...
+      Verificando sesion...
     </div>
   );
 
@@ -148,7 +142,7 @@ export default function App() {
 
   if (cargando) return (
     <div style={{ minHeight: "100vh", background: "#0A0E17", display: "flex", alignItems: "center", justifyContent: "center", color: "#4E8CFF", fontSize: 16, fontFamily: "sans-serif" }}>
-      🔄 Cargando datos...
+      Cargando datos...
     </div>
   );
 
@@ -171,7 +165,6 @@ export default function App() {
             </button>
           ))}
 
-          {/* Botón migrar naves — solo si hay naves con id numérico */}
           {navesConIdNumerico.length > 0 && (
             <button onClick={migrarInmuebles} disabled={migrandoInmuebles}
               style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 8, border: "1px dashed #FFB54744", cursor: migrandoInmuebles ? "default" : "pointer", textAlign: "left", width: "100%", background: "#2A2000", color: "#FFB547", fontSize: 12, fontWeight: 600, marginTop: 8 }}>
@@ -180,7 +173,6 @@ export default function App() {
             </button>
           )}
 
-          {/* Botón migrar inquilinos */}
           {naves.some(n => n.inquilino && n.inquilino.trim() !== "") && (
             <button onClick={migrarInquilinos} disabled={migrando}
               style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 8, border: "1px dashed #FFB54744", cursor: migrando ? "default" : "pointer", textAlign: "left", width: "100%", background: "#2A2000", color: "#FFB547", fontSize: 12, fontWeight: 600, marginTop: 4 }}>
@@ -201,7 +193,7 @@ export default function App() {
             </div>
           </div>
           <button onClick={handleLogout} style={{ width: "100%", background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#FF5C5C", padding: "8px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
-            🚪 Cerrar sesión
+            Cerrar sesion
           </button>
         </div>
       </aside>
@@ -212,6 +204,7 @@ export default function App() {
         {active === "naves" && <Naves naves={naves} setNaves={setNaves} />}
         {active === "inquilinos" && <Inquilinos />}
         {active === "cobrar" && <CuentasPorCobrar naves={naves} pagos={pagos} />}
+        {active === "gastos" && <Gastos />}
         {active === "estados" && <EstadosCuenta />}
         {active === "resumen" && <ResumenAnual naves={naves} pagos={pagos} />}
       </main>
