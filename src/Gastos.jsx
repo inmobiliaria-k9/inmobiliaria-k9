@@ -9,8 +9,8 @@ function ModalGasto({ onClose, onSave }) {
     concepto: "",
     monto: "",
     fecha: fechaHoy,
-    cuenta_id: "",
-    cuenta_nombre: "",
+    cuenta_id: "efectivo",
+    cuenta_nombre: "Efectivo — Caja general",
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -21,19 +21,25 @@ function ModalGasto({ onClose, onSave }) {
       snap.docs.forEach(d => {
         const p = d.data();
         (p.cuentas || []).forEach((c, i) => {
-          lista.push({ id: `${d.id}_${i}`, nombre: c.nombre || `Cuenta ${i + 1}`, banco: c.banco });
+          // Formato correcto: propietarioId_indice
+          lista.push({
+            id: `${d.id}_${i}`,
+            nombre: c.nombre || `Cuenta ${i + 1}`,
+            banco: c.banco
+          });
         });
       });
       setCuentas(lista);
-      set("cuenta_id", lista[0].id);
-      set("cuenta_nombre", `${lista[0].nombre} — ${lista[0].banco}`);
     };
     cargarCuentas();
   }, []);
 
   const seleccionarCuenta = (id) => {
     const c = cuentas.find(c => c.id === id);
-    if (c) { set("cuenta_id", id); set("cuenta_nombre", `${c.nombre} — ${c.banco}`); }
+    if (c) {
+      set("cuenta_id", id);
+      set("cuenta_nombre", `${c.nombre} — ${c.banco}`);
+    }
   };
 
   return (
@@ -69,7 +75,9 @@ function ModalGasto({ onClose, onSave }) {
             <select value={form.cuenta_id} onChange={e => seleccionarCuenta(e.target.value)}
               style={{ width: "100%", background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#FF5C5C", outline: "none", fontWeight: 600 }}>
               {cuentas.map(c => (
-                <option key={c.id} value={c.id}>{c.id === "efectivo" ? "Efectivo — Caja general" : `${c.nombre} — ${c.banco}`}</option>
+                <option key={c.id} value={c.id}>
+                  {c.id === "efectivo" ? "Efectivo — Caja general" : `${c.nombre} — ${c.banco}`}
+                </option>
               ))}
             </select>
           </div>
@@ -99,7 +107,6 @@ export default function Gastos() {
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "gastos"), snap => {
       const lista = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Ordenar por fecha — más antiguo arriba, más nuevo abajo
       lista.sort((a, b) => a.fecha > b.fecha ? 1 : -1);
       setGastos(lista);
     });
@@ -107,8 +114,7 @@ export default function Gastos() {
   }, []);
 
   useEffect(() => {
-    const cargarCuentas = async () => {
-      const snap = await getDocs(collection(db, "propietarios"));
+    const unsub = onSnapshot(collection(db, "propietarios"), snap => {
       const lista = [{ id: "efectivo", nombre: "Efectivo", banco: "Caja general" }];
       snap.docs.forEach(d => {
         const p = d.data();
@@ -117,8 +123,8 @@ export default function Gastos() {
         });
       });
       setCuentas(lista);
-    };
-    cargarCuentas();
+    });
+    return () => unsub();
   }, []);
 
   const agregar = async (data) => {
@@ -133,13 +139,13 @@ export default function Gastos() {
 
   const gastosFiltrados = filtroCuenta === "todas" ? gastos : gastos.filter(g => g.cuenta_id === filtroCuenta);
   const totalGastos = gastosFiltrados.reduce((s, g) => s + Number(g.monto), 0);
-  const gastosEsteMes = gastos.filter(g => g.fecha && g.fecha.startsWith(new Date().toISOString().substring(0, 7)));
-  const totalEsteMes = gastosEsteMes.reduce((s, g) => s + Number(g.monto), 0);
+  const mesActual = new Date().toISOString().substring(0, 7);
+  const totalEsteMes = gastos.filter(g => g.fecha && g.fecha.startsWith(mesActual)).reduce((s, g) => s + Number(g.monto), 0);
 
   const getNombreCuenta = (id) => {
     if (id === "efectivo") return { nombre: "Efectivo", color: "#FFB547", bg: "#2A2000" };
     const c = cuentas.find(c => c.id === id);
-    return c ? { nombre: `${c.nombre}`, color: "#4E8CFF", bg: "#0D1A2E" } : { nombre: id, color: "#4E6080", bg: "#141A28" };
+    return c ? { nombre: c.nombre, color: "#4E8CFF", bg: "#0D1A2E" } : { nombre: id, color: "#4E6080", bg: "#141A28" };
   };
 
   const formatFecha = (fecha) => {
@@ -176,7 +182,6 @@ export default function Gastos() {
         ))}
       </div>
 
-      {/* Filtro por cuenta */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         <button onClick={() => setFiltroCuenta("todas")} style={{ background: filtroCuenta === "todas" ? "#1A2535" : "none", border: `1px solid ${filtroCuenta === "todas" ? "#4E8CFF" : "#1E2740"}`, borderRadius: 20, color: filtroCuenta === "todas" ? "#4E8CFF" : "#4E6080", padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
           Todas las cuentas
@@ -192,7 +197,7 @@ export default function Gastos() {
         <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", padding: "60px", textAlign: "center", color: "#3A5070" }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
           <div style={{ fontSize: 15, marginBottom: 8 }}>No hay gastos registrados</div>
-          <div style={{ fontSize: 12 }}>Haz clic en "Nuevo gasto" para agregar el primero</div>
+          <div style={{ fontSize: 12 }}>Haz clic en "+ Nuevo gasto" para agregar el primero</div>
         </div>
       ) : (
         <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>
