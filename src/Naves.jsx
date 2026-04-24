@@ -3,6 +3,7 @@ import { db } from "./firebase";
 import { collection, doc, setDoc, addDoc, onSnapshot, getDocs } from "firebase/firestore";
 import { calcularEstado, calcularPrecioM2, estadoConfig, navesIniciales } from "./utils";
 import { Badge } from "./Badge";
+import { registrarAuditoria } from "./auditoria";
 
 const inmueblesSemilla = [
   { id: "inm1", nombre: "PARQUE JINT" },
@@ -105,15 +106,17 @@ export default function Naves({ naves, setNaves }) {
   }, []);
 
   const agregarInmueble = async (nombre) => {
-    const ref = await addDoc(collection(db, "inmuebles"), { nombre });
-    // inmuebles se actualiza por onSnapshot
+    await addDoc(collection(db, "inmuebles"), { nombre });
+    await registrarAuditoria({ tipo: "alta", modulo: "inmuebles", descripcion: `Inmueble agregado: ${nombre}`, detalle: null });
   };
 
   const guardarNave = async (updated) => {
     setGuardando(true);
     try {
+      const anterior = naves.find(n => n.id === updated.id);
       await setDoc(doc(db, "naves", updated.id), updated);
       setNaves(ns => ns.map(n => n.id === updated.id ? { ...n, ...updated } : n));
+      await registrarAuditoria({ tipo: "edicion", modulo: "naves", descripcion: `Nave editada: ${updated.nombre}`, detalle: { anterior: { renta: anterior?.renta, inquilino: anterior?.inquilino }, nuevo: { renta: updated.renta, inquilino: updated.inquilino } } });
     } catch (e) { console.error(e); }
     setGuardando(false);
   };
@@ -126,6 +129,7 @@ export default function Naves({ naves, setNaves }) {
       try {
         const ref = await addDoc(collection(db, "naves"), nueva);
         setNaves(ns => [...ns, { ...nueva, id: ref.id }]);
+        await registrarAuditoria({ tipo: "alta", modulo: "naves", descripcion: `Nave agregada: ${nombre} — ${m2} m²`, detalle: { inmueble_id } });
       } catch (e) { console.error(e); }
     }
   };

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from "firebase/firestore";
+import { registrarAuditoria } from "./auditoria";
 
 function Modal({ titulo, onClose, children }) {
   return (
@@ -127,16 +128,21 @@ export default function Propietarios() {
   const agregar = async (form) => {
     if (!form.nombre.trim()) return alert("El nombre es obligatorio");
     await addDoc(collection(db, "propietarios"), form);
+    await registrarAuditoria({ tipo: "alta", modulo: "propietarios", descripcion: `Propietario agregado: ${form.nombre}`, detalle: { cuentas: form.cuentas?.length || 0 } });
     setModalNuevo(false);
   };
 
   const actualizar = async (form) => {
+    const anterior = editando;
     await updateDoc(doc(db, "propietarios", editando.id), form);
+    await registrarAuditoria({ tipo: "edicion", modulo: "propietarios", descripcion: `Propietario editado: ${form.nombre}`, detalle: { cuentas_antes: anterior.cuentas?.length, cuentas_ahora: form.cuentas?.length } });
     setEditando(null);
   };
 
   const borrar = async (id) => {
+    const prop = propietarios.find(p => p.id === id);
     await deleteDoc(doc(db, "propietarios", id));
+    await registrarAuditoria({ tipo: "borrado", modulo: "propietarios", descripcion: `Propietario borrado: ${prop?.nombre}`, detalle: null });
     setConfirmBorrar(null);
   };
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { db } from "./firebase";
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, getDocs } from "firebase/firestore";
 import { inmuebles } from "./utils";
+import { registrarAuditoria } from "./auditoria";
 
 const hoy = new Date();
 
@@ -144,16 +145,21 @@ export default function Inquilinos() {
   const agregar = async (form) => {
     if (!form.alias.trim()) return alert("El alias es obligatorio");
     await addDoc(collection(db, "inquilinos"), form);
+    await registrarAuditoria({ tipo: "alta", modulo: "inquilinos", descripcion: `Inquilino agregado: ${form.alias}`, detalle: { razon_social: form.razon_social, rfc: form.rfc } });
     setModalNuevo(false);
   };
 
   const actualizar = async (form) => {
+    const anterior = editando;
     await updateDoc(doc(db, "inquilinos", editando.id), form);
+    await registrarAuditoria({ tipo: "edicion", modulo: "inquilinos", descripcion: `Inquilino editado: ${form.alias}`, detalle: { anterior: { alias: anterior.alias, nave_id: anterior.nave_id }, nuevo: { alias: form.alias, nave_id: form.nave_id } } });
     setEditando(null);
   };
 
   const borrar = async (id) => {
+    const inq = inquilinos.find(i => i.id === id);
     await deleteDoc(doc(db, "inquilinos", id));
+    await registrarAuditoria({ tipo: "borrado", modulo: "inquilinos", descripcion: `Inquilino borrado: ${inq?.alias}`, detalle: { razon_social: inq?.razon_social } });
     setConfirmBorrar(null);
   };
 
