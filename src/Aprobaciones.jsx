@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
 import { collection, onSnapshot, doc, deleteDoc, setDoc, addDoc, updateDoc } from "firebase/firestore";
+import { registrarAuditoria } from "./auditoria";
 
 export default function Aprobaciones() {
   const [pendientes, setPendientes] = useState([]);
@@ -60,6 +61,14 @@ export default function Aprobaciones() {
       }
       // Borrar de pendientes
       await deleteDoc(doc(db, "pendientes", item.id));
+      await registrarAuditoria({
+        tipo: "aprobacion",
+        modulo: item.tipo_movimiento === "pago" ? "pagos" : "gastos",
+        descripcion: item.tipo_movimiento === "pago"
+          ? `Pago aprobado: ${item.empresa} — ${item.mes} — $${Number(item.monto_base || 0).toLocaleString()}`
+          : `Gasto aprobado: ${item.concepto} — $${Number(item.monto || 0).toLocaleString()}`,
+        detalle: { monto: item.monto, cuenta: item.cuenta_nombre },
+      });
     } catch (e) {
       console.error("Error aprobando:", e);
       alert("Error al aprobar. Intenta de nuevo.");
@@ -69,6 +78,14 @@ export default function Aprobaciones() {
 
   const rechazar = async (item, nota) => {
     await deleteDoc(doc(db, "pendientes", item.id));
+    await registrarAuditoria({
+      tipo: "rechazo",
+      modulo: item.tipo_movimiento === "pago" ? "pagos" : "gastos",
+      descripcion: item.tipo_movimiento === "pago"
+        ? `Pago rechazado: ${item.empresa} — ${item.mes}`
+        : `Gasto rechazado: ${item.concepto}`,
+      detalle: nota ? { motivo: nota } : null,
+    });
     setConfirmRechazo(null);
     setNotaRechazo("");
   };

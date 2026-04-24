@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
 import { doc, setDoc, deleteDoc, updateDoc, addDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
+import { registrarAuditoria } from "./auditoria";
 import { MES_ACTUAL, TODOS_LOS_MESES, estadoPagoAutomatico, getPagoKey } from "./utils";
 import { Badge } from "./Badge";
 
@@ -400,11 +401,14 @@ export default function CuentasPorCobrar({ naves, pagos }) {
       aprobado: false,
       fecha_captura: new Date().toISOString(),
     });
+    await registrarAuditoria({ tipo: "alta", modulo: "pagos", descripcion: `Pago enviado a aprobacion: ${empresa} — ${data.mes} — $${Number(data.monto_base || 0).toLocaleString()}`, detalle: { cuenta: data.cuenta_nombre } });
     alert("Pago enviado a aprobacion");
   };
 
   const borrarPago = async (key) => {
+    const pago = pagosRegistrados.find(p => p.key === key);
     await deleteDoc(doc(db, "pagos", key));
+    await registrarAuditoria({ tipo: "borrado", modulo: "pagos", descripcion: `Pago borrado: ${pago?.empresa} — ${pago?.mes} — $${Number(pago?.monto_base || 0).toLocaleString()}`, detalle: null });
     setConfirmBorrar(null);
   };
 

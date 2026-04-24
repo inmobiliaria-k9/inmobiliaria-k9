@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
 import { collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, getDocs } from "firebase/firestore";
+import { registrarAuditoria } from "./auditoria";
 
 function ModalGasto({ inicial, onClose, onSave }) {
   const fechaHoy = new Date().toISOString().split("T")[0];
@@ -121,17 +122,22 @@ export default function Gastos() {
       aprobado: false,
       fecha_captura: new Date().toISOString(),
     });
+    await registrarAuditoria({ tipo: "alta", modulo: "gastos", descripcion: `Gasto enviado a aprobacion: ${data.concepto} — $${Number(data.monto).toLocaleString()}`, detalle: { cuenta: data.cuenta_nombre } });
     alert("Gasto enviado a aprobacion");
   };
 
   // Editar gasto ya aprobado (directo en gastos)
   const editar = async (data) => {
+    const anterior = editando;
     await updateDoc(doc(db, "gastos", editando.id), { ...data, monto: Number(data.monto) });
+    await registrarAuditoria({ tipo: "edicion", modulo: "gastos", descripcion: `Gasto editado: ${data.concepto}`, detalle: { anterior: { concepto: anterior.concepto, monto: anterior.monto }, nuevo: { concepto: data.concepto, monto: data.monto } } });
     setEditando(null);
   };
 
   const borrar = async (id) => {
+    const gasto = gastos.find(g => g.id === id);
     await deleteDoc(doc(db, "gastos", id));
+    await registrarAuditoria({ tipo: "borrado", modulo: "gastos", descripcion: `Gasto borrado: ${gasto?.concepto} — $${Number(gasto?.monto || 0).toLocaleString()}`, detalle: { cuenta: gasto?.cuenta_nombre } });
     setConfirmBorrar(null);
   };
 
