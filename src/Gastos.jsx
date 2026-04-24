@@ -1,16 +1,13 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
-import { collection, addDoc, deleteDoc, doc, onSnapshot, getDocs } from "firebase/firestore";
+import { collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, getDocs } from "firebase/firestore";
 
-function ModalGasto({ onClose, onSave }) {
+function ModalGasto({ inicial, onClose, onSave }) {
   const fechaHoy = new Date().toISOString().split("T")[0];
   const [cuentas, setCuentas] = useState([]);
-  const [form, setForm] = useState({
-    concepto: "",
-    monto: "",
-    fecha: fechaHoy,
-    cuenta_id: "efectivo",
-    cuenta_nombre: "Efectivo — Caja general",
+  const [form, setForm] = useState(inicial || {
+    concepto: "", monto: "", fecha: fechaHoy,
+    cuenta_id: "efectivo", cuenta_nombre: "Efectivo — Caja general",
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -21,12 +18,7 @@ function ModalGasto({ onClose, onSave }) {
       snap.docs.forEach(d => {
         const p = d.data();
         (p.cuentas || []).forEach((c, i) => {
-          // Formato correcto: propietarioId_indice
-          lista.push({
-            id: `${d.id}_${i}`,
-            nombre: c.nombre || `Cuenta ${i + 1}`,
-            banco: c.banco
-          });
+          lista.push({ id: `${d.id}_${i}`, nombre: c.nombre || `Cuenta ${i + 1}`, banco: c.banco });
         });
       });
       setCuentas(lista);
@@ -36,10 +28,7 @@ function ModalGasto({ onClose, onSave }) {
 
   const seleccionarCuenta = (id) => {
     const c = cuentas.find(c => c.id === id);
-    if (c) {
-      set("cuenta_id", id);
-      set("cuenta_nombre", `${c.nombre} — ${c.banco}`);
-    }
+    if (c) { set("cuenta_id", id); set("cuenta_nombre", `${c.nombre} — ${c.banco}`); }
   };
 
   return (
@@ -47,7 +36,7 @@ function ModalGasto({ onClose, onSave }) {
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background: "#0F1520", borderRadius: 16, border: "1px solid #1E2740", width: "100%", maxWidth: 420 }}>
         <div style={{ padding: "20px 24px", borderBottom: "1px solid #1E2740", display: "flex", justifyContent: "space-between" }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#E8EDF5" }}>Nuevo gasto</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#E8EDF5" }}>{inicial ? "Editar gasto" : "Nuevo gasto"}</div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#4E6080", cursor: "pointer", fontSize: 20 }}>x</button>
         </div>
         <div style={{ padding: "20px 24px" }}>
@@ -56,7 +45,6 @@ function ModalGasto({ onClose, onSave }) {
             <input value={form.concepto} onChange={e => set("concepto", e.target.value)} placeholder="Ej. Mantenimiento bomba agua"
               style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box" }} />
           </div>
-
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
             <div>
               <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Monto ($) *</label>
@@ -69,19 +57,15 @@ function ModalGasto({ onClose, onSave }) {
                 style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box" }} />
             </div>
           </div>
-
           <div style={{ marginBottom: 20 }}>
             <label style={{ display: "block", fontSize: 12, color: "#FF5C5C", marginBottom: 5, fontWeight: 600 }}>Cuenta de donde sale</label>
             <select value={form.cuenta_id} onChange={e => seleccionarCuenta(e.target.value)}
               style={{ width: "100%", background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#FF5C5C", outline: "none", fontWeight: 600 }}>
               {cuentas.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.id === "efectivo" ? "Efectivo — Caja general" : `${c.nombre} — ${c.banco}`}
-                </option>
+                <option key={c.id} value={c.id}>{c.id === "efectivo" ? "Efectivo — Caja general" : `${c.nombre} — ${c.banco}`}</option>
               ))}
             </select>
           </div>
-
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onClose} style={{ flex: 1, background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#4E6080", padding: 11, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
             <button onClick={() => {
@@ -89,7 +73,7 @@ function ModalGasto({ onClose, onSave }) {
               onSave({ ...form, monto: Number(form.monto), tipo: "gasto" });
               onClose();
             }} style={{ flex: 2, background: "linear-gradient(135deg, #FF5C5C, #FF8C5C)", border: "none", borderRadius: 8, color: "#fff", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-              Registrar gasto
+              {inicial ? "Guardar cambios" : "Registrar gasto"}
             </button>
           </div>
         </div>
@@ -101,6 +85,8 @@ function ModalGasto({ onClose, onSave }) {
 export default function Gastos() {
   const [gastos, setGastos] = useState([]);
   const [modalNuevo, setModalNuevo] = useState(false);
+  const [editando, setEditando] = useState(null);
+  const [confirmBorrar, setConfirmBorrar] = useState(null);
   const [filtroCuenta, setFiltroCuenta] = useState("todas");
   const [cuentas, setCuentas] = useState([]);
 
@@ -128,19 +114,23 @@ export default function Gastos() {
   }, []);
 
   const agregar = async (data) => {
-    await addDoc(collection(db, "gastos"), data);
+    await addDoc(collection(db, "gastos"), { ...data, aprobado: false });
+  };
+
+  const editar = async (data) => {
+    await updateDoc(doc(db, "gastos", editando.id), { ...data, monto: Number(data.monto) });
+    setEditando(null);
   };
 
   const borrar = async (id) => {
-    if (confirm("Seguro que quieres borrar este gasto?")) {
-      await deleteDoc(doc(db, "gastos", id));
-    }
+    await deleteDoc(doc(db, "gastos", id));
+    setConfirmBorrar(null);
   };
 
   const gastosFiltrados = filtroCuenta === "todas" ? gastos : gastos.filter(g => g.cuenta_id === filtroCuenta);
   const totalGastos = gastosFiltrados.reduce((s, g) => s + Number(g.monto), 0);
   const mesActual = new Date().toISOString().substring(0, 7);
-  const totalEsteMes = gastos.filter(g => g.fecha && g.fecha.startsWith(mesActual)).reduce((s, g) => s + Number(g.monto), 0);
+  const totalEsteMes = gastos.filter(g => g.fecha?.startsWith(mesActual)).reduce((s, g) => s + Number(g.monto), 0);
 
   const getNombreCuenta = (id) => {
     if (id === "efectivo") return { nombre: "Efectivo", color: "#FFB547", bg: "#2A2000" };
@@ -158,6 +148,23 @@ export default function Gastos() {
   return (
     <div style={{ padding: "28px" }}>
       {modalNuevo && <ModalGasto onClose={() => setModalNuevo(false)} onSave={agregar} />}
+      {editando && <ModalGasto inicial={editando} onClose={() => setEditando(null)} onSave={editar} />}
+
+      {/* Modal confirmar borrar */}
+      {confirmBorrar && (
+        <div style={{ position: "fixed", inset: 0, background: "#000000CC", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: "#0F1520", borderRadius: 16, border: "1px solid #1E2740", width: "100%", maxWidth: 380, padding: 28 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#E8EDF5", marginBottom: 8 }}>Confirmar borrar</div>
+            <div style={{ fontSize: 13, color: "#4E6080", marginBottom: 20 }}>
+              Seguro que quieres borrar <strong style={{ color: "#C8D8F0" }}>{confirmBorrar.concepto}</strong> por ${Number(confirmBorrar.monto).toLocaleString()}?
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setConfirmBorrar(null)} style={{ flex: 1, background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#4E6080", padding: 11, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
+              <button onClick={() => borrar(confirmBorrar.id)} style={{ flex: 1, background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 8, color: "#FF5C5C", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Si, borrar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
@@ -197,14 +204,13 @@ export default function Gastos() {
         <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", padding: "60px", textAlign: "center", color: "#3A5070" }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
           <div style={{ fontSize: 15, marginBottom: 8 }}>No hay gastos registrados</div>
-          <div style={{ fontSize: 12 }}>Haz clic en "+ Nuevo gasto" para agregar el primero</div>
         </div>
       ) : (
         <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#080C14" }}>
-                {["Fecha", "Concepto", "Cuenta", "Salida", ""].map(h => (
+                {["Fecha", "Concepto", "Cuenta", "Salida", "Acciones"].map(h => (
                   <th key={h} style={{ padding: "10px 16px", fontSize: 11, color: "#3A5070", textAlign: h === "Salida" ? "right" : "left", fontWeight: 600, textTransform: "uppercase" }}>{h}</th>
                 ))}
               </tr>
@@ -222,8 +228,11 @@ export default function Gastos() {
                       <span style={{ background: cuenta.bg, color: cuenta.color, borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600 }}>{cuenta.nombre}</span>
                     </td>
                     <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 800, color: "#FF5C5C", textAlign: "right" }}>-${Number(g.monto).toLocaleString()}</td>
-                    <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                      <button onClick={() => borrar(g.id)} style={{ background: "none", border: "none", color: "#3A5070", cursor: "pointer", fontSize: 12 }}>Borrar</button>
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button onClick={() => setEditando(g)} style={{ background: "#1A2535", border: "1px solid #1E2740", borderRadius: 6, color: "#4E8CFF", padding: "5px 10px", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>Editar</button>
+                        <button onClick={() => setConfirmBorrar(g)} style={{ background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 6, color: "#FF5C5C", padding: "5px 10px", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>Borrar</button>
+                      </div>
                     </td>
                   </tr>
                 );
