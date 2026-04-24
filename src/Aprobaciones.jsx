@@ -24,59 +24,43 @@ export default function Aprobaciones() {
       if (item.tipo_movimiento === "pago") {
         const key = `${item.empresa.replace(/\s+/g, "_")}__${item.mes.replace(/\s+/g, "_")}`;
         await setDoc(doc(db, "pagos", key), {
-          empresa: item.empresa,
-          mes: item.mes,
-          estado: item.estado,
-          fecha: item.fecha,
-          monto: item.monto,
-          monto_base: item.monto_base,
-          metodo: item.metodo,
-          cuenta_id: item.cuenta_id,
-          cuenta_nombre: item.cuenta_nombre,
-          aplica_iva: item.aplica_iva,
-          pct_iva: item.pct_iva,
-          aplica_ret_iva: item.aplica_ret_iva,
-          pct_ret_iva: item.pct_ret_iva,
-          aplica_ret_isr: item.aplica_ret_isr,
-          pct_ret_isr: item.pct_ret_isr,
-          iva: item.iva,
-          ret_iva: item.ret_iva,
-          ret_isr: item.ret_isr,
-          total_factura: item.total_factura,
-          notas: item.notas || "",
-          aprobado: true,
+          empresa: item.empresa, mes: item.mes, estado: item.estado,
+          fecha: item.fecha, monto: item.monto, monto_base: item.monto_base,
+          metodo: item.metodo, cuenta_id: item.cuenta_id, cuenta_nombre: item.cuenta_nombre,
+          aplica_iva: item.aplica_iva, pct_iva: item.pct_iva,
+          aplica_ret_iva: item.aplica_ret_iva, pct_ret_iva: item.pct_ret_iva,
+          aplica_ret_isr: item.aplica_ret_isr, pct_ret_isr: item.pct_ret_isr,
+          iva: item.iva, ret_iva: item.ret_iva, ret_isr: item.ret_isr,
+          total_factura: item.total_factura, notas: item.notas || "", aprobado: true,
         });
       } else if (item.tipo_movimiento === "gasto") {
         await addDoc(collection(db, "gastos"), {
-          concepto: item.concepto,
-          monto: item.monto,
-          fecha: item.fecha,
-          cuenta_id: item.cuenta_id,
-          cuenta_nombre: item.cuenta_nombre,
-          tipo: "gasto",
-          aprobado: true,
+          concepto: item.concepto, monto: item.monto, fecha: item.fecha,
+          cuenta_id: item.cuenta_id, cuenta_nombre: item.cuenta_nombre,
+          tipo: "gasto", aprobado: true,
         });
       } else if (item.tipo_movimiento === "propietario") {
         await addDoc(collection(db, "propietarios"), {
-          nombre: item.nombre,
-          cuentas: item.cuentas || [],
-          inmuebles_ids: item.inmuebles_ids || [],
-          aprobado: true,
+          nombre: item.nombre, cuentas: item.cuentas || [],
+          inmuebles_ids: item.inmuebles_ids || [], aprobado: true,
         });
       } else if (item.tipo_movimiento === "inmueble") {
         await addDoc(collection(db, "inmuebles"), {
-          nombre: item.nombre,
-          aprobado: true,
+          nombre: item.nombre, aprobado: true,
         });
       } else if (item.tipo_movimiento === "nave") {
         await addDoc(collection(db, "naves"), {
-          nombre: item.nombre,
-          m2: item.m2,
-          inmueble_id: item.inmueble_id,
-          renta: 0,
-          inquilino: "",
-          mantenimiento: false,
-          aprobado: true,
+          nombre: item.nombre, m2: item.m2, inmueble_id: item.inmueble_id,
+          renta: 0, inquilino: "", mantenimiento: false, aprobado: true,
+        });
+      } else if (item.tipo_movimiento === "inquilino") {
+        await addDoc(collection(db, "inquilinos"), {
+          alias: item.alias, razon_social: item.razon_social || "",
+          rfc: item.rfc || "", contacto: item.contacto || "",
+          telefono: item.telefono || "", correo: item.correo || "",
+          nave_id: item.nave_id || "", inmueble_id: item.inmueble_id || "",
+          fecha_inicio: item.fecha_inicio || "", fecha_fin: item.fecha_fin || "",
+          notas: item.notas || "", aprobado: true,
         });
       }
 
@@ -89,7 +73,8 @@ export default function Aprobaciones() {
           : item.tipo_movimiento === "gasto" ? `Gasto aprobado: ${item.concepto} — $${Number(item.monto || 0).toLocaleString()}`
           : item.tipo_movimiento === "propietario" ? `Propietario aprobado: ${item.nombre}`
           : item.tipo_movimiento === "inmueble" ? `Inmueble aprobado: ${item.nombre}`
-          : `Nave aprobada: ${item.nombre}`,
+          : item.tipo_movimiento === "nave" ? `Nave aprobada: ${item.nombre}`
+          : `Inquilino aprobado: ${item.alias}`,
         detalle: null,
       });
     } catch (e) {
@@ -109,7 +94,8 @@ export default function Aprobaciones() {
         : item.tipo_movimiento === "gasto" ? `Gasto rechazado: ${item.concepto}`
         : item.tipo_movimiento === "propietario" ? `Propietario rechazado: ${item.nombre}`
         : item.tipo_movimiento === "inmueble" ? `Inmueble rechazado: ${item.nombre}`
-        : `Nave rechazada: ${item.nombre}`,
+        : item.tipo_movimiento === "nave" ? `Nave rechazada: ${item.nombre}`
+        : `Inquilino rechazado: ${item.alias}`,
       detalle: nota ? { motivo: nota } : null,
     });
     setConfirmRechazo(null);
@@ -125,11 +111,12 @@ export default function Aprobaciones() {
 
   const fmt = n => `$${Math.round(Number(n) || 0).toLocaleString()}`;
 
-  const pagosPendientes = pendientes.filter(p => p.tipo_movimiento === "pago");
-  const gastosPendientes = pendientes.filter(p => p.tipo_movimiento === "gasto");
+  const pagosPendientes       = pendientes.filter(p => p.tipo_movimiento === "pago");
+  const gastosPendientes      = pendientes.filter(p => p.tipo_movimiento === "gasto");
   const propietariosPendientes = pendientes.filter(p => p.tipo_movimiento === "propietario");
-  const inmueblesPendientes = pendientes.filter(p => p.tipo_movimiento === "inmueble");
-  const navesPendientes = pendientes.filter(p => p.tipo_movimiento === "nave");
+  const inmueblesPendientes   = pendientes.filter(p => p.tipo_movimiento === "inmueble");
+  const navesPendientes       = pendientes.filter(p => p.tipo_movimiento === "nave");
+  const inquilinosPendientes  = pendientes.filter(p => p.tipo_movimiento === "inquilino");
 
   const BotonesAccion = ({ item }) => (
     <div style={{ display: "flex", gap: 6 }}>
@@ -146,6 +133,19 @@ export default function Aprobaciones() {
 
   const thStyle = { padding: "10px 16px", fontSize: 11, color: "#3A5070", textAlign: "left", fontWeight: 600, textTransform: "uppercase" };
   const tdStyle = { padding: "12px 16px", fontSize: 13 };
+  const trHover = {
+    onMouseEnter: e => e.currentTarget.style.background = "#141A28",
+    onMouseLeave: e => e.currentTarget.style.background = "transparent",
+  };
+
+  const Seccion = ({ titulo, children }) => (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>{titulo}</div>
+      <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>{children}</table>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ padding: "28px" }}>
@@ -160,7 +160,8 @@ export default function Aprobaciones() {
               : confirmRechazo.tipo_movimiento === "gasto" ? `Gasto: ${confirmRechazo.concepto}`
               : confirmRechazo.tipo_movimiento === "propietario" ? `Propietario: ${confirmRechazo.nombre}`
               : confirmRechazo.tipo_movimiento === "inmueble" ? `Inmueble: ${confirmRechazo.nombre}`
-              : `Nave: ${confirmRechazo.nombre}`}
+              : confirmRechazo.tipo_movimiento === "nave" ? `Nave: ${confirmRechazo.nombre}`
+              : `Inquilino: ${confirmRechazo.alias}`}
             </div>
             <div style={{ marginBottom: 20 }}>
               <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 6, fontWeight: 600 }}>Motivo del rechazo (opcional)</label>
@@ -198,137 +199,122 @@ export default function Aprobaciones() {
         <>
           {/* Propietarios */}
           {propietariosPendientes.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>🏢 Propietarios pendientes ({propietariosPendientes.length})</div>
-              <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead><tr style={{ background: "#080C14" }}>
-                    {["Fecha captura", "Nombre", "Inmuebles", "Cuentas", "Acciones"].map(h => <th key={h} style={thStyle}>{h}</th>)}
-                  </tr></thead>
-                  <tbody>
-                    {propietariosPendientes.map((p, i) => (
-                      <tr key={i} style={{ borderTop: "1px solid #141A28" }}
-                        onMouseEnter={e => e.currentTarget.style.background = "#141A28"}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(p.fecha_captura?.split("T")[0])}</td>
-                        <td style={{ ...tdStyle, fontWeight: 600, color: "#C8D8F0" }}>{p.nombre}</td>
-                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{p.inmuebles_ids?.length || 0} inmueble(s)</td>
-                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{p.cuentas?.length || 0} cuenta(s)</td>
-                        <td style={tdStyle}><BotonesAccion item={p} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <Seccion titulo={`🏢 Propietarios pendientes (${propietariosPendientes.length})`}>
+              <thead><tr style={{ background: "#080C14" }}>
+                {["Fecha captura","Nombre","Inmuebles","Cuentas","Acciones"].map(h => <th key={h} style={thStyle}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {propietariosPendientes.map((p, i) => (
+                  <tr key={i} style={{ borderTop: "1px solid #141A28" }} {...trHover}>
+                    <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(p.fecha_captura?.split("T")[0])}</td>
+                    <td style={{ ...tdStyle, fontWeight: 600, color: "#C8D8F0" }}>{p.nombre}</td>
+                    <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{p.inmuebles_ids?.length || 0} inmueble(s)</td>
+                    <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{p.cuentas?.length || 0} cuenta(s)</td>
+                    <td style={tdStyle}><BotonesAccion item={p} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </Seccion>
           )}
 
           {/* Inmuebles */}
           {inmueblesPendientes.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>🏭 Inmuebles pendientes ({inmueblesPendientes.length})</div>
-              <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead><tr style={{ background: "#080C14" }}>
-                    {["Fecha captura", "Nombre", "Acciones"].map(h => <th key={h} style={thStyle}>{h}</th>)}
-                  </tr></thead>
-                  <tbody>
-                    {inmueblesPendientes.map((p, i) => (
-                      <tr key={i} style={{ borderTop: "1px solid #141A28" }}
-                        onMouseEnter={e => e.currentTarget.style.background = "#141A28"}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(p.fecha_captura?.split("T")[0])}</td>
-                        <td style={{ ...tdStyle, fontWeight: 600, color: "#C8D8F0" }}>{p.nombre}</td>
-                        <td style={tdStyle}><BotonesAccion item={p} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <Seccion titulo={`🏭 Inmuebles pendientes (${inmueblesPendientes.length})`}>
+              <thead><tr style={{ background: "#080C14" }}>
+                {["Fecha captura","Nombre","Acciones"].map(h => <th key={h} style={thStyle}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {inmueblesPendientes.map((p, i) => (
+                  <tr key={i} style={{ borderTop: "1px solid #141A28" }} {...trHover}>
+                    <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(p.fecha_captura?.split("T")[0])}</td>
+                    <td style={{ ...tdStyle, fontWeight: 600, color: "#C8D8F0" }}>{p.nombre}</td>
+                    <td style={tdStyle}><BotonesAccion item={p} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </Seccion>
           )}
 
           {/* Naves */}
           {navesPendientes.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>🏗️ Naves pendientes ({navesPendientes.length})</div>
-              <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead><tr style={{ background: "#080C14" }}>
-                    {["Fecha captura", "Nombre", "M²", "Acciones"].map(h => <th key={h} style={thStyle}>{h}</th>)}
-                  </tr></thead>
-                  <tbody>
-                    {navesPendientes.map((p, i) => (
-                      <tr key={i} style={{ borderTop: "1px solid #141A28" }}
-                        onMouseEnter={e => e.currentTarget.style.background = "#141A28"}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(p.fecha_captura?.split("T")[0])}</td>
-                        <td style={{ ...tdStyle, fontWeight: 600, color: "#C8D8F0" }}>{p.nombre}</td>
-                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{Number(p.m2).toLocaleString()} m²</td>
-                        <td style={tdStyle}><BotonesAccion item={p} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <Seccion titulo={`🏗️ Naves pendientes (${navesPendientes.length})`}>
+              <thead><tr style={{ background: "#080C14" }}>
+                {["Fecha captura","Nombre","M²","Acciones"].map(h => <th key={h} style={thStyle}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {navesPendientes.map((p, i) => (
+                  <tr key={i} style={{ borderTop: "1px solid #141A28" }} {...trHover}>
+                    <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(p.fecha_captura?.split("T")[0])}</td>
+                    <td style={{ ...tdStyle, fontWeight: 600, color: "#C8D8F0" }}>{p.nombre}</td>
+                    <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{Number(p.m2).toLocaleString()} m²</td>
+                    <td style={tdStyle}><BotonesAccion item={p} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </Seccion>
+          )}
+
+          {/* Inquilinos */}
+          {inquilinosPendientes.length > 0 && (
+            <Seccion titulo={`👥 Inquilinos pendientes (${inquilinosPendientes.length})`}>
+              <thead><tr style={{ background: "#080C14" }}>
+                {["Fecha captura","Alias","Razón social","RFC","Acciones"].map(h => <th key={h} style={thStyle}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {inquilinosPendientes.map((p, i) => (
+                  <tr key={i} style={{ borderTop: "1px solid #141A28" }} {...trHover}>
+                    <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(p.fecha_captura?.split("T")[0])}</td>
+                    <td style={{ ...tdStyle, fontWeight: 600, color: "#C8D8F0" }}>{p.alias}</td>
+                    <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{p.razon_social || "-"}</td>
+                    <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{p.rfc || "-"}</td>
+                    <td style={tdStyle}><BotonesAccion item={p} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </Seccion>
           )}
 
           {/* Pagos */}
           {pagosPendientes.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>💰 Pagos pendientes ({pagosPendientes.length})</div>
-              <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead><tr style={{ background: "#080C14" }}>
-                    {["Fecha captura", "Inquilino", "Periodo", "Monto base", "Entra a cuenta", "Cuenta", "Acciones"].map(h => <th key={h} style={thStyle}>{h}</th>)}
-                  </tr></thead>
-                  <tbody>
-                    {pagosPendientes.map((p, i) => (
-                      <tr key={i} style={{ borderTop: "1px solid #141A28" }}
-                        onMouseEnter={e => e.currentTarget.style.background = "#141A28"}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(p.fecha_captura?.split("T")[0])}</td>
-                        <td style={{ ...tdStyle, fontWeight: 600, color: "#C8D8F0" }}>{p.empresa}</td>
-                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{p.mes}</td>
-                        <td style={{ ...tdStyle, fontWeight: 700, color: "#C8D8F0" }}>{fmt(p.monto_base)}</td>
-                        <td style={{ ...tdStyle, fontWeight: 700, color: "#00C896" }}>{fmt(p.monto)}</td>
-                        <td style={{ ...tdStyle, fontSize: 11, color: "#4E6080" }}>{p.cuenta_nombre || "-"}</td>
-                        <td style={tdStyle}><BotonesAccion item={p} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <Seccion titulo={`💰 Pagos pendientes (${pagosPendientes.length})`}>
+              <thead><tr style={{ background: "#080C14" }}>
+                {["Fecha captura","Inquilino","Periodo","Monto base","Entra a cuenta","Cuenta","Acciones"].map(h => <th key={h} style={thStyle}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {pagosPendientes.map((p, i) => (
+                  <tr key={i} style={{ borderTop: "1px solid #141A28" }} {...trHover}>
+                    <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(p.fecha_captura?.split("T")[0])}</td>
+                    <td style={{ ...tdStyle, fontWeight: 600, color: "#C8D8F0" }}>{p.empresa}</td>
+                    <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{p.mes}</td>
+                    <td style={{ ...tdStyle, fontWeight: 700, color: "#C8D8F0" }}>{fmt(p.monto_base)}</td>
+                    <td style={{ ...tdStyle, fontWeight: 700, color: "#00C896" }}>{fmt(p.monto)}</td>
+                    <td style={{ ...tdStyle, fontSize: 11, color: "#4E6080" }}>{p.cuenta_nombre || "-"}</td>
+                    <td style={tdStyle}><BotonesAccion item={p} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </Seccion>
           )}
 
           {/* Gastos */}
           {gastosPendientes.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>📝 Gastos pendientes ({gastosPendientes.length})</div>
-              <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead><tr style={{ background: "#080C14" }}>
-                    {["Fecha captura", "Concepto", "Fecha gasto", "Monto", "Cuenta", "Acciones"].map(h => <th key={h} style={thStyle}>{h}</th>)}
-                  </tr></thead>
-                  <tbody>
-                    {gastosPendientes.map((g, i) => (
-                      <tr key={i} style={{ borderTop: "1px solid #141A28" }}
-                        onMouseEnter={e => e.currentTarget.style.background = "#141A28"}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(g.fecha_captura?.split("T")[0])}</td>
-                        <td style={{ ...tdStyle, fontWeight: 600, color: "#C8D8F0" }}>{g.concepto}</td>
-                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(g.fecha)}</td>
-                        <td style={{ ...tdStyle, fontWeight: 700, color: "#FF5C5C" }}>-{fmt(g.monto)}</td>
-                        <td style={{ ...tdStyle, fontSize: 11, color: "#4E6080" }}>{g.cuenta_nombre || "-"}</td>
-                        <td style={tdStyle}><BotonesAccion item={g} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <Seccion titulo={`📝 Gastos pendientes (${gastosPendientes.length})`}>
+              <thead><tr style={{ background: "#080C14" }}>
+                {["Fecha captura","Concepto","Fecha gasto","Monto","Cuenta","Acciones"].map(h => <th key={h} style={thStyle}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {gastosPendientes.map((g, i) => (
+                  <tr key={i} style={{ borderTop: "1px solid #141A28" }} {...trHover}>
+                    <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(g.fecha_captura?.split("T")[0])}</td>
+                    <td style={{ ...tdStyle, fontWeight: 600, color: "#C8D8F0" }}>{g.concepto}</td>
+                    <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(g.fecha)}</td>
+                    <td style={{ ...tdStyle, fontWeight: 700, color: "#FF5C5C" }}>-{fmt(g.monto)}</td>
+                    <td style={{ ...tdStyle, fontSize: 11, color: "#4E6080" }}>{g.cuenta_nombre || "-"}</td>
+                    <td style={tdStyle}><BotonesAccion item={g} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </Seccion>
           )}
         </>
       )}

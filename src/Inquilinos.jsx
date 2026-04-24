@@ -115,7 +115,7 @@ function FormInquilino({ inicial, naves, onGuardar, onCancelar }) {
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={onCancelar} style={{ flex: 1, background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#4E6080", padding: 11, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
         <button onClick={() => onGuardar(form)} style={{ flex: 2, background: "linear-gradient(135deg, #00C896, #4E8CFF)", border: "none", borderRadius: 8, color: "#fff", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-          {inicial ? "Guardar cambios" : "Agregar inquilino"}
+          {inicial ? "Guardar cambios" : "Enviar a aprobación"}
         </button>
       </div>
     </div>
@@ -144,22 +144,42 @@ export default function Inquilinos() {
 
   const agregar = async (form) => {
     if (!form.alias.trim()) return alert("El alias es obligatorio");
-    await addDoc(collection(db, "inquilinos"), form);
-    await registrarAuditoria({ tipo: "alta", modulo: "inquilinos", descripcion: `Inquilino agregado: ${form.alias}`, detalle: { razon_social: form.razon_social, rfc: form.rfc } });
+    await addDoc(collection(db, "pendientes"), {
+      ...form,
+      tipo_movimiento: "inquilino",
+      fecha_captura: new Date().toISOString(),
+    });
+    await registrarAuditoria({
+      tipo: "alta",
+      modulo: "inquilinos",
+      descripcion: `Inquilino enviado a aprobación: ${form.alias}`,
+      detalle: { razon_social: form.razon_social, rfc: form.rfc },
+    });
     setModalNuevo(false);
+    alert("Inquilino enviado a aprobaciones ✅");
   };
 
   const actualizar = async (form) => {
     const anterior = editando;
     await updateDoc(doc(db, "inquilinos", editando.id), form);
-    await registrarAuditoria({ tipo: "edicion", modulo: "inquilinos", descripcion: `Inquilino editado: ${form.alias}`, detalle: { anterior: { alias: anterior.alias, nave_id: anterior.nave_id }, nuevo: { alias: form.alias, nave_id: form.nave_id } } });
+    await registrarAuditoria({
+      tipo: "edicion",
+      modulo: "inquilinos",
+      descripcion: `Inquilino editado: ${form.alias}`,
+      detalle: { anterior: { alias: anterior.alias, nave_id: anterior.nave_id }, nuevo: { alias: form.alias, nave_id: form.nave_id } },
+    });
     setEditando(null);
   };
 
   const borrar = async (id) => {
     const inq = inquilinos.find(i => i.id === id);
     await deleteDoc(doc(db, "inquilinos", id));
-    await registrarAuditoria({ tipo: "borrado", modulo: "inquilinos", descripcion: `Inquilino borrado: ${inq?.alias}`, detalle: { razon_social: inq?.razon_social } });
+    await registrarAuditoria({
+      tipo: "borrado",
+      modulo: "inquilinos",
+      descripcion: `Inquilino borrado: ${inq?.alias}`,
+      detalle: { razon_social: inq?.razon_social },
+    });
     setConfirmBorrar(null);
   };
 
@@ -212,7 +232,6 @@ export default function Inquilinos() {
         </button>
       </div>
 
-      {/* Alertas de contratos */}
       {(vencidos.length > 0 || vencenPronto.length > 0) && (
         <div style={{ marginBottom: 20 }}>
           {vencidos.length > 0 && (
@@ -230,7 +249,6 @@ export default function Inquilinos() {
         </div>
       )}
 
-      {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 20 }}>
         {[
           ["Total", inquilinos.length, "#4E8CFF"],
@@ -245,7 +263,6 @@ export default function Inquilinos() {
         ))}
       </div>
 
-      {/* Buscador */}
       <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="🔍 Buscar por alias, razón social, RFC..."
         style={{ width: "100%", background: "#0F1520", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 14px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box", marginBottom: 16 }} />
 
@@ -281,7 +298,6 @@ export default function Inquilinos() {
                 </div>
 
                 <div style={{ padding: "14px 18px" }}>
-                  {/* Nave */}
                   {nave && (
                     <div style={{ background: "#0A0E17", borderRadius: 8, padding: "8px 12px", border: "1px solid #1E2740", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
@@ -291,16 +307,12 @@ export default function Inquilinos() {
                       {nave.renta > 0 && <div style={{ fontSize: 14, fontWeight: 800, color: "#00C896" }}>${Number(nave.renta).toLocaleString()}</div>}
                     </div>
                   )}
-
-                  {/* Contrato */}
                   {alerta && (
                     <div style={{ background: alerta.bg, borderRadius: 8, padding: "7px 12px", border: `1px solid ${alerta.color}33`, marginBottom: 10 }}>
                       <div style={{ fontSize: 11, color: alerta.color, fontWeight: 600 }}>📋 Contrato: {alerta.label}</div>
                       {inq.fecha_fin && <div style={{ fontSize: 11, color: "#3A5070", marginTop: 2 }}>Vence: {inq.fecha_fin}</div>}
                     </div>
                   )}
-
-                  {/* Contacto */}
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     {inq.contacto && <div style={{ fontSize: 12, color: "#4E6080" }}>👤 {inq.contacto}</div>}
                     {inq.telefono && <div style={{ fontSize: 12, color: "#4E6080" }}>📞 {inq.telefono}</div>}
