@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
-import { collection, onSnapshot, doc, setDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, setDoc, addDoc } from "firebase/firestore";
 import { MES_ACTUAL, TODOS_LOS_MESES, estadoPagoAutomatico, getPagoKey } from "./utils";
 
 function getInquilinos(naves, inmuebles) {
@@ -47,12 +47,19 @@ export default function ResumenAnual({ naves, pagos }) {
   const inquilinos = getInquilinos(naves, inmuebles);
 
   const registrarPago = async (empresa, mes, renta) => {
-    const key = getPagoKey(empresa, mes);
     const fechaHoy = new Date().toISOString().split("T")[0];
-    await setDoc(doc(db, "pagos", key), {
+    await addDoc(collection(db, "pendientes"), {
       empresa, mes, estado: "pagado",
-      fecha: fechaHoy, monto: renta, monto_base: renta, metodo: "Transferencia"
+      fecha: fechaHoy, monto: renta, monto_base: renta, metodo: "Transferencia",
+      cuenta_id: "", cuenta_nombre: "",
+      aplica_iva: true, pct_iva: 16,
+      aplica_ret_iva: true, pct_ret_iva: 10.67,
+      aplica_ret_isr: true, pct_ret_isr: 10,
+      tipo_movimiento: "pago",
+      aprobado: false,
+      fecha_captura: new Date().toISOString(),
     });
+    alert("Pago enviado a aprobacion");
   };
 
   return (
