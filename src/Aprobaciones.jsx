@@ -22,7 +22,6 @@ export default function Aprobaciones() {
     setProcesando(item.id);
     try {
       if (item.tipo_movimiento === "pago") {
-        // Mover a colección pagos
         const key = `${item.empresa.replace(/\s+/g, "_")}__${item.mes.replace(/\s+/g, "_")}`;
         await setDoc(doc(db, "pagos", key), {
           empresa: item.empresa,
@@ -48,7 +47,6 @@ export default function Aprobaciones() {
           aprobado: true,
         });
       } else if (item.tipo_movimiento === "gasto") {
-        // Mover a colección gastos
         await addDoc(collection(db, "gastos"), {
           concepto: item.concepto,
           monto: item.monto,
@@ -58,15 +56,24 @@ export default function Aprobaciones() {
           tipo: "gasto",
           aprobado: true,
         });
+      } else if (item.tipo_movimiento === "propietario") {
+        await addDoc(collection(db, "propietarios"), {
+          nombre: item.nombre,
+          cuentas: item.cuentas || [],
+          inmuebles_ids: item.inmuebles_ids || [],
+          aprobado: true,
+        });
       }
-      // Borrar de pendientes
+
       await deleteDoc(doc(db, "pendientes", item.id));
       await registrarAuditoria({
         tipo: "aprobacion",
-        modulo: item.tipo_movimiento === "pago" ? "pagos" : "gastos",
+        modulo: item.tipo_movimiento === "pago" ? "pagos" : item.tipo_movimiento === "gasto" ? "gastos" : "propietarios",
         descripcion: item.tipo_movimiento === "pago"
           ? `Pago aprobado: ${item.empresa} — ${item.mes} — $${Number(item.monto_base || 0).toLocaleString()}`
-          : `Gasto aprobado: ${item.concepto} — $${Number(item.monto || 0).toLocaleString()}`,
+          : item.tipo_movimiento === "gasto"
+          ? `Gasto aprobado: ${item.concepto} — $${Number(item.monto || 0).toLocaleString()}`
+          : `Propietario aprobado: ${item.nombre}`,
         detalle: { monto: item.monto, cuenta: item.cuenta_nombre },
       });
     } catch (e) {
@@ -80,10 +87,12 @@ export default function Aprobaciones() {
     await deleteDoc(doc(db, "pendientes", item.id));
     await registrarAuditoria({
       tipo: "rechazo",
-      modulo: item.tipo_movimiento === "pago" ? "pagos" : "gastos",
+      modulo: item.tipo_movimiento === "pago" ? "pagos" : item.tipo_movimiento === "gasto" ? "gastos" : "propietarios",
       descripcion: item.tipo_movimiento === "pago"
         ? `Pago rechazado: ${item.empresa} — ${item.mes}`
-        : `Gasto rechazado: ${item.concepto}`,
+        : item.tipo_movimiento === "gasto"
+        ? `Gasto rechazado: ${item.concepto}`
+        : `Propietario rechazado: ${item.nombre}`,
       detalle: nota ? { motivo: nota } : null,
     });
     setConfirmRechazo(null);
@@ -101,6 +110,7 @@ export default function Aprobaciones() {
 
   const pagosPendientes = pendientes.filter(p => p.tipo_movimiento === "pago");
   const gastosPendientes = pendientes.filter(p => p.tipo_movimiento === "gasto");
+  const propietariosPendientes = pendientes.filter(p => p.tipo_movimiento === "propietario");
 
   return (
     <div style={{ padding: "28px" }}>
@@ -113,11 +123,13 @@ export default function Aprobaciones() {
             <div style={{ fontSize: 13, color: "#4E6080", marginBottom: 16 }}>
               {confirmRechazo.tipo_movimiento === "pago"
                 ? `Pago de ${confirmRechazo.empresa} — ${confirmRechazo.mes}`
-                : `Gasto: ${confirmRechazo.concepto}`}
+                : confirmRechazo.tipo_movimiento === "gasto"
+                ? `Gasto: ${confirmRechazo.concepto}`
+                : `Propietario: ${confirmRechazo.nombre}`}
             </div>
             <div style={{ marginBottom: 20 }}>
               <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 6, fontWeight: 600 }}>Motivo del rechazo (opcional)</label>
-              <input value={notaRechazo} onChange={e => setNotaRechazo(e.target.value)} placeholder="Ej. Monto incorrecto, duplicado..."
+              <input value={notaRechazo} onChange={e => setNotaRechazo(e.target.value)} placeholder="Ej. Datos incorrectos, duplicado..."
                 style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box" }} />
             </div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -144,15 +156,57 @@ export default function Aprobaciones() {
         <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", padding: "60px", textAlign: "center", color: "#3A5070" }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
           <div style={{ fontSize: 15, marginBottom: 8 }}>No hay movimientos pendientes</div>
-          <div style={{ fontSize: 12 }}>Cuando el capturista registre pagos o gastos apareceran aqui</div>
+          <div style={{ fontSize: 12 }}>Cuando el administrador registre movimientos apareceran aqui</div>
         </div>
       ) : (
         <>
+          {/* Propietarios pendientes */}
+          {propietariosPendientes.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>
+                🏢 Propietarios pendientes ({propietariosPendientes.length})
+              </div>
+              <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ background: "#080C14" }}>
+                      {["Fecha captura", "Nombre", "Inmuebles", "Cuentas bancarias", "Acciones"].map(h => (
+                        <th key={h} style={{ padding: "10px 16px", fontSize: 11, color: "#3A5070", textAlign: "left", fontWeight: 600, textTransform: "uppercase" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {propietariosPendientes.map((p, i) => (
+                      <tr key={i} style={{ borderTop: "1px solid #141A28" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "#141A28"}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <td style={{ padding: "12px 16px", fontSize: 12, color: "#4E6080" }}>{formatFecha(p.fecha_captura?.split("T")[0])}</td>
+                        <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "#C8D8F0" }}>{p.nombre}</td>
+                        <td style={{ padding: "12px 16px", fontSize: 12, color: "#4E6080" }}>{p.inmuebles_ids?.length || 0} inmueble(s)</td>
+                        <td style={{ padding: "12px 16px", fontSize: 12, color: "#4E6080" }}>{p.cuentas?.length || 0} cuenta(s)</td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <button onClick={() => aprobar(p)} disabled={procesando === p.id}
+                              style={{ background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 6, color: "#00C896", padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                              {procesando === p.id ? "..." : "Aprobar"}
+                            </button>
+                            <button onClick={() => setConfirmRechazo(p)}
+                              style={{ background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 6, color: "#FF5C5C", padding: "6px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Rechazar</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Pagos pendientes */}
           {pagosPendientes.length > 0 && (
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>
-                Pagos pendientes ({pagosPendientes.length})
+                💰 Pagos pendientes ({pagosPendientes.length})
               </div>
               <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -176,9 +230,7 @@ export default function Aprobaciones() {
                         <td style={{ padding: "12px 16px", fontSize: 11, color: "#4E6080" }}>{p.cuenta_nombre || "-"}</td>
                         <td style={{ padding: "12px 16px" }}>
                           <div style={{ display: "flex", gap: 6 }}>
-                            <button
-                              onClick={() => aprobar(p)}
-                              disabled={procesando === p.id}
+                            <button onClick={() => aprobar(p)} disabled={procesando === p.id}
                               style={{ background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 6, color: "#00C896", padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                               {procesando === p.id ? "..." : "Aprobar"}
                             </button>
@@ -197,7 +249,7 @@ export default function Aprobaciones() {
           {gastosPendientes.length > 0 && (
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>
-                Gastos pendientes ({gastosPendientes.length})
+                📝 Gastos pendientes ({gastosPendientes.length})
               </div>
               <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -220,9 +272,7 @@ export default function Aprobaciones() {
                         <td style={{ padding: "12px 16px", fontSize: 11, color: "#4E6080" }}>{g.cuenta_nombre || "-"}</td>
                         <td style={{ padding: "12px 16px" }}>
                           <div style={{ display: "flex", gap: 6 }}>
-                            <button
-                              onClick={() => aprobar(g)}
-                              disabled={procesando === g.id}
+                            <button onClick={() => aprobar(g)} disabled={procesando === g.id}
                               style={{ background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 6, color: "#00C896", padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                               {procesando === g.id ? "..." : "Aprobar"}
                             </button>

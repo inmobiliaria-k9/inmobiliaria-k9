@@ -101,7 +101,7 @@ function FormPropietario({ inicial, inmuebles, onGuardar, onCancelar }) {
       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
         <button onClick={onCancelar} style={{ flex: 1, background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#4E6080", padding: 11, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
         <button onClick={() => onGuardar(form)} style={{ flex: 2, background: "linear-gradient(135deg, #00C896, #4E8CFF)", border: "none", borderRadius: 8, color: "#fff", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-          {inicial ? "Guardar cambios" : "Agregar propietario"}
+          {inicial ? "Guardar cambios" : "Enviar a aprobación"}
         </button>
       </div>
     </div>
@@ -127,22 +127,42 @@ export default function Propietarios() {
 
   const agregar = async (form) => {
     if (!form.nombre.trim()) return alert("El nombre es obligatorio");
-    await addDoc(collection(db, "propietarios"), form);
-    await registrarAuditoria({ tipo: "alta", modulo: "propietarios", descripcion: `Propietario agregado: ${form.nombre}`, detalle: { cuentas: form.cuentas?.length || 0 } });
+    await addDoc(collection(db, "pendientes"), {
+      ...form,
+      tipo_movimiento: "propietario",
+      fecha_captura: new Date().toISOString(),
+    });
+    await registrarAuditoria({
+      tipo: "alta",
+      modulo: "propietarios",
+      descripcion: `Propietario enviado a aprobación: ${form.nombre}`,
+      detalle: { cuentas: form.cuentas?.length || 0 },
+    });
     setModalNuevo(false);
+    alert("Propietario enviado a aprobaciones ✅");
   };
 
   const actualizar = async (form) => {
     const anterior = editando;
     await updateDoc(doc(db, "propietarios", editando.id), form);
-    await registrarAuditoria({ tipo: "edicion", modulo: "propietarios", descripcion: `Propietario editado: ${form.nombre}`, detalle: { cuentas_antes: anterior.cuentas?.length, cuentas_ahora: form.cuentas?.length } });
+    await registrarAuditoria({
+      tipo: "edicion",
+      modulo: "propietarios",
+      descripcion: `Propietario editado: ${form.nombre}`,
+      detalle: { cuentas_antes: anterior.cuentas?.length, cuentas_ahora: form.cuentas?.length },
+    });
     setEditando(null);
   };
 
   const borrar = async (id) => {
     const prop = propietarios.find(p => p.id === id);
     await deleteDoc(doc(db, "propietarios", id));
-    await registrarAuditoria({ tipo: "borrado", modulo: "propietarios", descripcion: `Propietario borrado: ${prop?.nombre}`, detalle: null });
+    await registrarAuditoria({
+      tipo: "borrado",
+      modulo: "propietarios",
+      descripcion: `Propietario borrado: ${prop?.nombre}`,
+      detalle: null,
+    });
     setConfirmBorrar(null);
   };
 
