@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
-import { collection, doc, setDoc, addDoc, onSnapshot, getDocs } from "firebase/firestore";
-import { calcularEstado, calcularPrecioM2, estadoConfig, navesIniciales } from "./utils";
+import { collection, doc, setDoc, addDoc, onSnapshot } from "firebase/firestore";
+import { calcularEstado, calcularPrecioM2, estadoConfig } from "./utils";
 import { Badge } from "./Badge";
 import { registrarAuditoria } from "./auditoria";
 
@@ -28,8 +28,44 @@ function ModalInmueble({ inicial, onClose, onSave }) {
             style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "10px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box", marginBottom: 20 }} />
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onClose} style={{ flex: 1, background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#4E6080", padding: 11, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
-            <button onClick={() => { if (nombre.trim()) { onSave(nombre.trim()); onClose(); } }} style={{ flex: 2, background: "linear-gradient(135deg, #00C896, #4E8CFF)", border: "none", borderRadius: 8, color: "#fff", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-              {inicial ? "Guardar" : "Agregar inmueble"}
+            <button onClick={() => { if (nombre.trim()) { onSave(nombre.trim()); onClose(); } }}
+              style={{ flex: 2, background: "linear-gradient(135deg, #00C896, #4E8CFF)", border: "none", borderRadius: 8, color: "#fff", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+              {inicial ? "Guardar" : "Enviar a aprobación"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalNave({ inmueble_id, onClose, onSave }) {
+  const [nombre, setNombre] = useState("");
+  const [m2, setM2] = useState("");
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#000000CC", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: "#0F1520", borderRadius: 16, border: "1px solid #1E2740", width: "100%", maxWidth: 400 }}>
+        <div style={{ padding: "20px 24px", borderBottom: "1px solid #1E2740", display: "flex", justifyContent: "space-between" }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#E8EDF5" }}>➕ Nueva nave</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#4E6080", cursor: "pointer", fontSize: 20 }}>✕</button>
+        </div>
+        <div style={{ padding: "20px 24px" }}>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 6, fontWeight: 600 }}>Nombre de la nave *</label>
+            <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej. Nave A"
+              style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "10px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box" }} />
+          </div>
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 6, fontWeight: 600 }}>Metros cuadrados *</label>
+            <input value={m2} onChange={e => setM2(e.target.value)} placeholder="Ej. 1200" type="number"
+              style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "10px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box" }} />
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={onClose} style={{ flex: 1, background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#4E6080", padding: 11, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
+            <button onClick={() => { if (nombre.trim() && m2) { onSave(nombre.trim(), m2); onClose(); } }}
+              style={{ flex: 2, background: "linear-gradient(135deg, #00C896, #4E8CFF)", border: "none", borderRadius: 8, color: "#fff", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+              Enviar a aprobación
             </button>
           </div>
         </div>
@@ -77,7 +113,8 @@ function EditarNaveModal({ nave, onClose, onSave }) {
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onClose} style={{ flex: 1, background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#4E6080", padding: 11, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
-            <button onClick={() => { onSave({ ...form, estado: estadoCalculado }); onClose(); }} style={{ flex: 2, background: "linear-gradient(135deg, #00C896, #4E8CFF)", border: "none", borderRadius: 8, color: "#fff", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Guardar</button>
+            <button onClick={() => { onSave({ ...form, estado: estadoCalculado }); onClose(); }}
+              style={{ flex: 2, background: "linear-gradient(135deg, #00C896, #4E8CFF)", border: "none", borderRadius: 8, color: "#fff", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Guardar</button>
           </div>
         </div>
       </div>
@@ -89,13 +126,12 @@ export default function Naves({ naves, setNaves }) {
   const [inmuebles, setInmuebles] = useState([]);
   const [editando, setEditando] = useState(null);
   const [modalInmueble, setModalInmueble] = useState(false);
+  const [modalNave, setModalNave] = useState(null);
   const [guardando, setGuardando] = useState(false);
 
-  // Cargar inmuebles desde Firebase
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "inmuebles"), snap => {
       if (snap.empty) {
-        // Primera vez — migrar inmuebles semilla
         inmueblesSemilla.forEach(inm => setDoc(doc(db, "inmuebles", inm.id), { nombre: inm.nombre }));
         setInmuebles(inmueblesSemilla);
       } else {
@@ -106,8 +142,28 @@ export default function Naves({ naves, setNaves }) {
   }, []);
 
   const agregarInmueble = async (nombre) => {
-    await addDoc(collection(db, "inmuebles"), { nombre });
-    await registrarAuditoria({ tipo: "alta", modulo: "inmuebles", descripcion: `Inmueble agregado: ${nombre}`, detalle: null });
+    await addDoc(collection(db, "pendientes"), {
+      tipo_movimiento: "inmueble",
+      nombre,
+      fecha_captura: new Date().toISOString(),
+    });
+    await registrarAuditoria({ tipo: "alta", modulo: "inmuebles", descripcion: `Inmueble enviado a aprobación: ${nombre}`, detalle: null });
+    alert("Inmueble enviado a aprobaciones ✅");
+  };
+
+  const agregarNave = async (nombre, m2, inmueble_id) => {
+    await addDoc(collection(db, "pendientes"), {
+      tipo_movimiento: "nave",
+      nombre,
+      m2: Number(m2),
+      inmueble_id,
+      renta: 0,
+      inquilino: "",
+      mantenimiento: false,
+      fecha_captura: new Date().toISOString(),
+    });
+    await registrarAuditoria({ tipo: "alta", modulo: "naves", descripcion: `Nave enviada a aprobación: ${nombre} — ${m2} m²`, detalle: { inmueble_id } });
+    alert("Nave enviada a aprobaciones ✅");
   };
 
   const guardarNave = async (updated) => {
@@ -121,19 +177,6 @@ export default function Naves({ naves, setNaves }) {
     setGuardando(false);
   };
 
-  const agregarNave = async (inmueble_id) => {
-    const nombre = prompt("Nombre de la nave:");
-    const m2 = prompt("Metros cuadrados:");
-    if (nombre && m2) {
-      const nueva = { inmueble_id, nombre, m2: Number(m2), renta: 0, inquilino: "", mantenimiento: false };
-      try {
-        const ref = await addDoc(collection(db, "naves"), nueva);
-        setNaves(ns => [...ns, { ...nueva, id: ref.id }]);
-        await registrarAuditoria({ tipo: "alta", modulo: "naves", descripcion: `Nave agregada: ${nombre} — ${m2} m²`, detalle: { inmueble_id } });
-      } catch (e) { console.error(e); }
-    }
-  };
-
   const rentaTotal = naves.reduce((s, n) => s + Number(n.renta), 0);
   const rentadas = naves.filter(n => calcularEstado(n) === "rentada").length;
   const m2Rentados = naves.filter(n => calcularEstado(n) === "rentada").reduce((s, n) => s + Number(n.m2), 0);
@@ -142,6 +185,7 @@ export default function Naves({ naves, setNaves }) {
     <div style={{ padding: "28px" }}>
       {editando && <EditarNaveModal nave={editando} onClose={() => setEditando(null)} onSave={guardarNave} />}
       {modalInmueble && <ModalInmueble onClose={() => setModalInmueble(false)} onSave={agregarInmueble} />}
+      {modalNave && <ModalNave inmueble_id={modalNave} onClose={() => setModalNave(null)} onSave={(nombre, m2) => agregarNave(nombre, m2, modalNave)} />}
       {guardando && <div style={{ position: "fixed", top: 20, right: 20, background: "#00C896", color: "#fff", padding: "10px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, zIndex: 300 }}>💾 Guardando...</div>}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
@@ -189,7 +233,7 @@ export default function Naves({ naves, setNaves }) {
                   <div style={{ fontSize: 18, fontWeight: 800, color: rentadasInm === navesInm.length && navesInm.length > 0 ? "#00C896" : "#FFB547" }}>{rentadasInm}/{navesInm.length}</div>
                   <div style={{ fontSize: 11, color: "#3A5070" }}>rentadas</div>
                 </div>
-                <button onClick={() => agregarNave(inm.id)} style={{ background: "linear-gradient(135deg, #00C896, #4E8CFF)", border: "none", borderRadius: 8, color: "#fff", padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+ Nave</button>
+                <button onClick={() => setModalNave(inm.id)} style={{ background: "linear-gradient(135deg, #00C896, #4E8CFF)", border: "none", borderRadius: 8, color: "#fff", padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+ Nave</button>
               </div>
             </div>
             {navesInm.length === 0 ? (

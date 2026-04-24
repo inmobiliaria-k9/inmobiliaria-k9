@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
-import { collection, onSnapshot, doc, deleteDoc, setDoc, addDoc, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, deleteDoc, setDoc, addDoc } from "firebase/firestore";
 import { registrarAuditoria } from "./auditoria";
 
 export default function Aprobaciones() {
@@ -63,18 +63,34 @@ export default function Aprobaciones() {
           inmuebles_ids: item.inmuebles_ids || [],
           aprobado: true,
         });
+      } else if (item.tipo_movimiento === "inmueble") {
+        await addDoc(collection(db, "inmuebles"), {
+          nombre: item.nombre,
+          aprobado: true,
+        });
+      } else if (item.tipo_movimiento === "nave") {
+        await addDoc(collection(db, "naves"), {
+          nombre: item.nombre,
+          m2: item.m2,
+          inmueble_id: item.inmueble_id,
+          renta: 0,
+          inquilino: "",
+          mantenimiento: false,
+          aprobado: true,
+        });
       }
 
       await deleteDoc(doc(db, "pendientes", item.id));
       await registrarAuditoria({
         tipo: "aprobacion",
-        modulo: item.tipo_movimiento === "pago" ? "pagos" : item.tipo_movimiento === "gasto" ? "gastos" : "propietarios",
-        descripcion: item.tipo_movimiento === "pago"
-          ? `Pago aprobado: ${item.empresa} — ${item.mes} — $${Number(item.monto_base || 0).toLocaleString()}`
-          : item.tipo_movimiento === "gasto"
-          ? `Gasto aprobado: ${item.concepto} — $${Number(item.monto || 0).toLocaleString()}`
-          : `Propietario aprobado: ${item.nombre}`,
-        detalle: { monto: item.monto, cuenta: item.cuenta_nombre },
+        modulo: item.tipo_movimiento,
+        descripcion:
+          item.tipo_movimiento === "pago" ? `Pago aprobado: ${item.empresa} — ${item.mes} — $${Number(item.monto_base || 0).toLocaleString()}`
+          : item.tipo_movimiento === "gasto" ? `Gasto aprobado: ${item.concepto} — $${Number(item.monto || 0).toLocaleString()}`
+          : item.tipo_movimiento === "propietario" ? `Propietario aprobado: ${item.nombre}`
+          : item.tipo_movimiento === "inmueble" ? `Inmueble aprobado: ${item.nombre}`
+          : `Nave aprobada: ${item.nombre}`,
+        detalle: null,
       });
     } catch (e) {
       console.error("Error aprobando:", e);
@@ -87,12 +103,13 @@ export default function Aprobaciones() {
     await deleteDoc(doc(db, "pendientes", item.id));
     await registrarAuditoria({
       tipo: "rechazo",
-      modulo: item.tipo_movimiento === "pago" ? "pagos" : item.tipo_movimiento === "gasto" ? "gastos" : "propietarios",
-      descripcion: item.tipo_movimiento === "pago"
-        ? `Pago rechazado: ${item.empresa} — ${item.mes}`
-        : item.tipo_movimiento === "gasto"
-        ? `Gasto rechazado: ${item.concepto}`
-        : `Propietario rechazado: ${item.nombre}`,
+      modulo: item.tipo_movimiento,
+      descripcion:
+        item.tipo_movimiento === "pago" ? `Pago rechazado: ${item.empresa} — ${item.mes}`
+        : item.tipo_movimiento === "gasto" ? `Gasto rechazado: ${item.concepto}`
+        : item.tipo_movimiento === "propietario" ? `Propietario rechazado: ${item.nombre}`
+        : item.tipo_movimiento === "inmueble" ? `Inmueble rechazado: ${item.nombre}`
+        : `Nave rechazada: ${item.nombre}`,
       detalle: nota ? { motivo: nota } : null,
     });
     setConfirmRechazo(null);
@@ -111,6 +128,24 @@ export default function Aprobaciones() {
   const pagosPendientes = pendientes.filter(p => p.tipo_movimiento === "pago");
   const gastosPendientes = pendientes.filter(p => p.tipo_movimiento === "gasto");
   const propietariosPendientes = pendientes.filter(p => p.tipo_movimiento === "propietario");
+  const inmueblesPendientes = pendientes.filter(p => p.tipo_movimiento === "inmueble");
+  const navesPendientes = pendientes.filter(p => p.tipo_movimiento === "nave");
+
+  const BotonesAccion = ({ item }) => (
+    <div style={{ display: "flex", gap: 6 }}>
+      <button onClick={() => aprobar(item)} disabled={procesando === item.id}
+        style={{ background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 6, color: "#00C896", padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+        {procesando === item.id ? "..." : "Aprobar"}
+      </button>
+      <button onClick={() => setConfirmRechazo(item)}
+        style={{ background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 6, color: "#FF5C5C", padding: "6px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+        Rechazar
+      </button>
+    </div>
+  );
+
+  const thStyle = { padding: "10px 16px", fontSize: 11, color: "#3A5070", textAlign: "left", fontWeight: 600, textTransform: "uppercase" };
+  const tdStyle = { padding: "12px 16px", fontSize: 13 };
 
   return (
     <div style={{ padding: "28px" }}>
@@ -121,11 +156,11 @@ export default function Aprobaciones() {
           <div style={{ background: "#0F1520", borderRadius: 16, border: "1px solid #1E2740", width: "100%", maxWidth: 400, padding: 28 }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: "#E8EDF5", marginBottom: 8 }}>Rechazar movimiento</div>
             <div style={{ fontSize: 13, color: "#4E6080", marginBottom: 16 }}>
-              {confirmRechazo.tipo_movimiento === "pago"
-                ? `Pago de ${confirmRechazo.empresa} — ${confirmRechazo.mes}`
-                : confirmRechazo.tipo_movimiento === "gasto"
-                ? `Gasto: ${confirmRechazo.concepto}`
-                : `Propietario: ${confirmRechazo.nombre}`}
+              {confirmRechazo.tipo_movimiento === "pago" ? `Pago de ${confirmRechazo.empresa} — ${confirmRechazo.mes}`
+              : confirmRechazo.tipo_movimiento === "gasto" ? `Gasto: ${confirmRechazo.concepto}`
+              : confirmRechazo.tipo_movimiento === "propietario" ? `Propietario: ${confirmRechazo.nombre}`
+              : confirmRechazo.tipo_movimiento === "inmueble" ? `Inmueble: ${confirmRechazo.nombre}`
+              : `Nave: ${confirmRechazo.nombre}`}
             </div>
             <div style={{ marginBottom: 20 }}>
               <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 6, fontWeight: 600 }}>Motivo del rechazo (opcional)</label>
@@ -133,8 +168,10 @@ export default function Aprobaciones() {
                 style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box" }} />
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => { setConfirmRechazo(null); setNotaRechazo(""); }} style={{ flex: 1, background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#4E6080", padding: 11, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
-              <button onClick={() => rechazar(confirmRechazo, notaRechazo)} style={{ flex: 1, background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 8, color: "#FF5C5C", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Rechazar</button>
+              <button onClick={() => { setConfirmRechazo(null); setNotaRechazo(""); }}
+                style={{ flex: 1, background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#4E6080", padding: 11, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
+              <button onClick={() => rechazar(confirmRechazo, notaRechazo)}
+                style={{ flex: 1, background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 8, color: "#FF5C5C", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Rechazar</button>
             </div>
           </div>
         </div>
@@ -146,8 +183,7 @@ export default function Aprobaciones() {
           <div style={{ fontSize: 12, color: "#3A5070", marginTop: 2 }}>
             {pendientes.length > 0
               ? <span style={{ color: "#FFB547", fontWeight: 600 }}>{pendientes.length} movimiento{pendientes.length !== 1 ? "s" : ""} pendiente{pendientes.length !== 1 ? "s" : ""} de aprobacion</span>
-              : <span style={{ color: "#00C896" }}>Todo al dia — no hay movimientos pendientes</span>
-            }
+              : <span style={{ color: "#00C896" }}>Todo al dia — no hay movimientos pendientes</span>}
           </div>
         </div>
       </div>
@@ -160,40 +196,25 @@ export default function Aprobaciones() {
         </div>
       ) : (
         <>
-          {/* Propietarios pendientes */}
+          {/* Propietarios */}
           {propietariosPendientes.length > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>
-                🏢 Propietarios pendientes ({propietariosPendientes.length})
-              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>🏢 Propietarios pendientes ({propietariosPendientes.length})</div>
               <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ background: "#080C14" }}>
-                      {["Fecha captura", "Nombre", "Inmuebles", "Cuentas bancarias", "Acciones"].map(h => (
-                        <th key={h} style={{ padding: "10px 16px", fontSize: 11, color: "#3A5070", textAlign: "left", fontWeight: 600, textTransform: "uppercase" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
+                  <thead><tr style={{ background: "#080C14" }}>
+                    {["Fecha captura", "Nombre", "Inmuebles", "Cuentas", "Acciones"].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                  </tr></thead>
                   <tbody>
                     {propietariosPendientes.map((p, i) => (
                       <tr key={i} style={{ borderTop: "1px solid #141A28" }}
                         onMouseEnter={e => e.currentTarget.style.background = "#141A28"}
                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                        <td style={{ padding: "12px 16px", fontSize: 12, color: "#4E6080" }}>{formatFecha(p.fecha_captura?.split("T")[0])}</td>
-                        <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "#C8D8F0" }}>{p.nombre}</td>
-                        <td style={{ padding: "12px 16px", fontSize: 12, color: "#4E6080" }}>{p.inmuebles_ids?.length || 0} inmueble(s)</td>
-                        <td style={{ padding: "12px 16px", fontSize: 12, color: "#4E6080" }}>{p.cuentas?.length || 0} cuenta(s)</td>
-                        <td style={{ padding: "12px 16px" }}>
-                          <div style={{ display: "flex", gap: 6 }}>
-                            <button onClick={() => aprobar(p)} disabled={procesando === p.id}
-                              style={{ background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 6, color: "#00C896", padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                              {procesando === p.id ? "..." : "Aprobar"}
-                            </button>
-                            <button onClick={() => setConfirmRechazo(p)}
-                              style={{ background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 6, color: "#FF5C5C", padding: "6px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Rechazar</button>
-                          </div>
-                        </td>
+                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(p.fecha_captura?.split("T")[0])}</td>
+                        <td style={{ ...tdStyle, fontWeight: 600, color: "#C8D8F0" }}>{p.nombre}</td>
+                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{p.inmuebles_ids?.length || 0} inmueble(s)</td>
+                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{p.cuentas?.length || 0} cuenta(s)</td>
+                        <td style={tdStyle}><BotonesAccion item={p} /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -202,41 +223,78 @@ export default function Aprobaciones() {
             </div>
           )}
 
-          {/* Pagos pendientes */}
-          {pagosPendientes.length > 0 && (
+          {/* Inmuebles */}
+          {inmueblesPendientes.length > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>
-                💰 Pagos pendientes ({pagosPendientes.length})
-              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>🏭 Inmuebles pendientes ({inmueblesPendientes.length})</div>
               <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ background: "#080C14" }}>
-                      {["Fecha captura", "Inquilino", "Periodo", "Monto base", "Entra a cuenta", "Cuenta", "Acciones"].map(h => (
-                        <th key={h} style={{ padding: "10px 16px", fontSize: 11, color: "#3A5070", textAlign: "left", fontWeight: 600, textTransform: "uppercase" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
+                  <thead><tr style={{ background: "#080C14" }}>
+                    {["Fecha captura", "Nombre", "Acciones"].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                  </tr></thead>
+                  <tbody>
+                    {inmueblesPendientes.map((p, i) => (
+                      <tr key={i} style={{ borderTop: "1px solid #141A28" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "#141A28"}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(p.fecha_captura?.split("T")[0])}</td>
+                        <td style={{ ...tdStyle, fontWeight: 600, color: "#C8D8F0" }}>{p.nombre}</td>
+                        <td style={tdStyle}><BotonesAccion item={p} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Naves */}
+          {navesPendientes.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>🏗️ Naves pendientes ({navesPendientes.length})</div>
+              <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead><tr style={{ background: "#080C14" }}>
+                    {["Fecha captura", "Nombre", "M²", "Acciones"].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                  </tr></thead>
+                  <tbody>
+                    {navesPendientes.map((p, i) => (
+                      <tr key={i} style={{ borderTop: "1px solid #141A28" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "#141A28"}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(p.fecha_captura?.split("T")[0])}</td>
+                        <td style={{ ...tdStyle, fontWeight: 600, color: "#C8D8F0" }}>{p.nombre}</td>
+                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{Number(p.m2).toLocaleString()} m²</td>
+                        <td style={tdStyle}><BotonesAccion item={p} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Pagos */}
+          {pagosPendientes.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>💰 Pagos pendientes ({pagosPendientes.length})</div>
+              <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead><tr style={{ background: "#080C14" }}>
+                    {["Fecha captura", "Inquilino", "Periodo", "Monto base", "Entra a cuenta", "Cuenta", "Acciones"].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                  </tr></thead>
                   <tbody>
                     {pagosPendientes.map((p, i) => (
                       <tr key={i} style={{ borderTop: "1px solid #141A28" }}
                         onMouseEnter={e => e.currentTarget.style.background = "#141A28"}
                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                        <td style={{ padding: "12px 16px", fontSize: 12, color: "#4E6080" }}>{formatFecha(p.fecha_captura?.split("T")[0])}</td>
-                        <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "#C8D8F0" }}>{p.empresa}</td>
-                        <td style={{ padding: "12px 16px", fontSize: 12, color: "#4E6080" }}>{p.mes}</td>
-                        <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700, color: "#C8D8F0" }}>{fmt(p.monto_base)}</td>
-                        <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700, color: "#00C896" }}>{fmt(p.monto)}</td>
-                        <td style={{ padding: "12px 16px", fontSize: 11, color: "#4E6080" }}>{p.cuenta_nombre || "-"}</td>
-                        <td style={{ padding: "12px 16px" }}>
-                          <div style={{ display: "flex", gap: 6 }}>
-                            <button onClick={() => aprobar(p)} disabled={procesando === p.id}
-                              style={{ background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 6, color: "#00C896", padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                              {procesando === p.id ? "..." : "Aprobar"}
-                            </button>
-                            <button onClick={() => setConfirmRechazo(p)} style={{ background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 6, color: "#FF5C5C", padding: "6px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Rechazar</button>
-                          </div>
-                        </td>
+                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(p.fecha_captura?.split("T")[0])}</td>
+                        <td style={{ ...tdStyle, fontWeight: 600, color: "#C8D8F0" }}>{p.empresa}</td>
+                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{p.mes}</td>
+                        <td style={{ ...tdStyle, fontWeight: 700, color: "#C8D8F0" }}>{fmt(p.monto_base)}</td>
+                        <td style={{ ...tdStyle, fontWeight: 700, color: "#00C896" }}>{fmt(p.monto)}</td>
+                        <td style={{ ...tdStyle, fontSize: 11, color: "#4E6080" }}>{p.cuenta_nombre || "-"}</td>
+                        <td style={tdStyle}><BotonesAccion item={p} /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -245,40 +303,26 @@ export default function Aprobaciones() {
             </div>
           )}
 
-          {/* Gastos pendientes */}
+          {/* Gastos */}
           {gastosPendientes.length > 0 && (
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>
-                📝 Gastos pendientes ({gastosPendientes.length})
-              </div>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#C8D8F0", marginBottom: 12 }}>📝 Gastos pendientes ({gastosPendientes.length})</div>
               <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ background: "#080C14" }}>
-                      {["Fecha captura", "Concepto", "Fecha gasto", "Monto", "Cuenta", "Acciones"].map(h => (
-                        <th key={h} style={{ padding: "10px 16px", fontSize: 11, color: "#3A5070", textAlign: "left", fontWeight: 600, textTransform: "uppercase" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
+                  <thead><tr style={{ background: "#080C14" }}>
+                    {["Fecha captura", "Concepto", "Fecha gasto", "Monto", "Cuenta", "Acciones"].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                  </tr></thead>
                   <tbody>
                     {gastosPendientes.map((g, i) => (
                       <tr key={i} style={{ borderTop: "1px solid #141A28" }}
                         onMouseEnter={e => e.currentTarget.style.background = "#141A28"}
                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                        <td style={{ padding: "12px 16px", fontSize: 12, color: "#4E6080" }}>{formatFecha(g.fecha_captura?.split("T")[0])}</td>
-                        <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "#C8D8F0" }}>{g.concepto}</td>
-                        <td style={{ padding: "12px 16px", fontSize: 12, color: "#4E6080" }}>{formatFecha(g.fecha)}</td>
-                        <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700, color: "#FF5C5C" }}>-{fmt(g.monto)}</td>
-                        <td style={{ padding: "12px 16px", fontSize: 11, color: "#4E6080" }}>{g.cuenta_nombre || "-"}</td>
-                        <td style={{ padding: "12px 16px" }}>
-                          <div style={{ display: "flex", gap: 6 }}>
-                            <button onClick={() => aprobar(g)} disabled={procesando === g.id}
-                              style={{ background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 6, color: "#00C896", padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                              {procesando === g.id ? "..." : "Aprobar"}
-                            </button>
-                            <button onClick={() => setConfirmRechazo(g)} style={{ background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 6, color: "#FF5C5C", padding: "6px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Rechazar</button>
-                          </div>
-                        </td>
+                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(g.fecha_captura?.split("T")[0])}</td>
+                        <td style={{ ...tdStyle, fontWeight: 600, color: "#C8D8F0" }}>{g.concepto}</td>
+                        <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(g.fecha)}</td>
+                        <td style={{ ...tdStyle, fontWeight: 700, color: "#FF5C5C" }}>-{fmt(g.monto)}</td>
+                        <td style={{ ...tdStyle, fontSize: 11, color: "#4E6080" }}>{g.cuenta_nombre || "-"}</td>
+                        <td style={tdStyle}><BotonesAccion item={g} /></td>
                       </tr>
                     ))}
                   </tbody>
