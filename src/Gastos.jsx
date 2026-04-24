@@ -73,7 +73,7 @@ function ModalGasto({ inicial, onClose, onSave }) {
               onSave({ ...form, monto: Number(form.monto), tipo: "gasto" });
               onClose();
             }} style={{ flex: 2, background: "linear-gradient(135deg, #FF5C5C, #FF8C5C)", border: "none", borderRadius: 8, color: "#fff", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-              {inicial ? "Guardar cambios" : "Registrar gasto"}
+              {inicial ? "Guardar cambios" : "Enviar a aprobacion"}
             </button>
           </div>
         </div>
@@ -113,10 +113,18 @@ export default function Gastos() {
     return () => unsub();
   }, []);
 
+  // Nuevo gasto va a PENDIENTES para aprobacion
   const agregar = async (data) => {
-    await addDoc(collection(db, "gastos"), { ...data, aprobado: false });
+    await addDoc(collection(db, "pendientes"), {
+      ...data,
+      tipo_movimiento: "gasto",
+      aprobado: false,
+      fecha_captura: new Date().toISOString(),
+    });
+    alert("Gasto enviado a aprobacion");
   };
 
+  // Editar gasto ya aprobado (directo en gastos)
   const editar = async (data) => {
     await updateDoc(doc(db, "gastos", editando.id), { ...data, monto: Number(data.monto) });
     setEditando(null);
@@ -150,13 +158,12 @@ export default function Gastos() {
       {modalNuevo && <ModalGasto onClose={() => setModalNuevo(false)} onSave={agregar} />}
       {editando && <ModalGasto inicial={editando} onClose={() => setEditando(null)} onSave={editar} />}
 
-      {/* Modal confirmar borrar */}
       {confirmBorrar && (
         <div style={{ position: "fixed", inset: 0, background: "#000000CC", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
           <div style={{ background: "#0F1520", borderRadius: 16, border: "1px solid #1E2740", width: "100%", maxWidth: 380, padding: 28 }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: "#E8EDF5", marginBottom: 8 }}>Confirmar borrar</div>
             <div style={{ fontSize: 13, color: "#4E6080", marginBottom: 20 }}>
-              Seguro que quieres borrar <strong style={{ color: "#C8D8F0" }}>{confirmBorrar.concepto}</strong> por ${Number(confirmBorrar.monto).toLocaleString()}?
+              Seguro que quieres borrar <strong style={{ color: "#C8D8F0" }}>{confirmBorrar.concepto}</strong>?
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => setConfirmBorrar(null)} style={{ flex: 1, background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#4E6080", padding: 11, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
@@ -169,18 +176,22 @@ export default function Gastos() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 800, color: "#E8EDF5" }}>Gastos</div>
-          <div style={{ fontSize: 12, color: "#3A5070", marginTop: 2 }}>{gastos.length} gasto{gastos.length !== 1 ? "s" : ""} registrado{gastos.length !== 1 ? "s" : ""}</div>
+          <div style={{ fontSize: 12, color: "#3A5070", marginTop: 2 }}>{gastos.length} gasto{gastos.length !== 1 ? "s" : ""} aprobado{gastos.length !== 1 ? "s" : ""}</div>
         </div>
         <button onClick={() => setModalNuevo(true)} style={{ background: "linear-gradient(135deg, #FF5C5C, #FF8C5C)", border: "none", borderRadius: 8, color: "#fff", padding: "10px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
           + Nuevo gasto
         </button>
       </div>
 
+      <div style={{ background: "#2A2000", border: "1px solid #FFB54733", borderRadius: 10, padding: "10px 16px", marginBottom: 20, fontSize: 12, color: "#FFB547" }}>
+        Los gastos nuevos van a Aprobaciones antes de aparecer aqui
+      </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
         {[
           ["Total gastos", `-$${totalGastos.toLocaleString()}`, "#FF5C5C"],
           ["Este mes", `-$${totalEsteMes.toLocaleString()}`, "#FFB547"],
-          ["Movimientos", gastos.length, "#4E8CFF"],
+          ["Aprobados", gastos.length, "#4E8CFF"],
         ].map(([l, v, c], i) => (
           <div key={i} style={{ background: "#0F1520", borderRadius: 10, padding: "14px 16px", border: "1px solid #1E2740" }}>
             <div style={{ fontSize: 11, color: "#4E6080", marginBottom: 6 }}>{l}</div>
@@ -203,7 +214,7 @@ export default function Gastos() {
       {gastosFiltrados.length === 0 ? (
         <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", padding: "60px", textAlign: "center", color: "#3A5070" }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
-          <div style={{ fontSize: 15, marginBottom: 8 }}>No hay gastos registrados</div>
+          <div style={{ fontSize: 15 }}>No hay gastos aprobados aun</div>
         </div>
       ) : (
         <div style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>

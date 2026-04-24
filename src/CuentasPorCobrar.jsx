@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
-import { doc, setDoc, deleteDoc, updateDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
+import { doc, setDoc, deleteDoc, updateDoc, addDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
 import { MES_ACTUAL, TODOS_LOS_MESES, estadoPagoAutomatico, getPagoKey } from "./utils";
 import { Badge } from "./Badge";
 
@@ -393,8 +393,14 @@ export default function CuentasPorCobrar({ naves, pagos }) {
   const inquilinos = getInquilinos(naves, inmuebles);
 
   const registrarPago = async (empresa, data) => {
-    const key = getPagoKey(empresa, data.mes);
-    await setDoc(doc(db, "pagos", key), { empresa, ...data });
+    await addDoc(collection(db, "pendientes"), {
+      ...data,
+      empresa,
+      tipo_movimiento: "pago",
+      aprobado: false,
+      fecha_captura: new Date().toISOString(),
+    });
+    alert("Pago enviado a aprobacion");
   };
 
   const borrarPago = async (key) => {

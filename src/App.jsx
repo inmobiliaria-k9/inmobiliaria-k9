@@ -12,6 +12,7 @@ import Propietarios from "./Propietarios";
 import Inquilinos from "./Inquilinos";
 import EstadosCuenta from "./EstadosCuenta";
 import Gastos from "./Gastos";
+import Aprobaciones from "./Aprobaciones";
 
 const auth = getAuth();
 
@@ -22,6 +23,7 @@ const navItems = [
   { id: "inquilinos", label: "Inquilinos", icon: "👥" },
   { id: "cobrar", label: "Cuentas por Cobrar", icon: "💳" },
   { id: "gastos", label: "Gastos", icon: "📋" },
+  { id: "aprobaciones", label: "Aprobaciones", icon: "✅" },
   { id: "estados", label: "Estados de Cuenta", icon: "🏦" },
   { id: "resumen", label: "Resumen Anual", icon: "📊" },
 ];
@@ -205,6 +207,7 @@ export default function App() {
         {active === "inquilinos" && <Inquilinos />}
         {active === "cobrar" && <CuentasPorCobrar naves={naves} pagos={pagos} />}
         {active === "gastos" && <Gastos />}
+        {active === "aprobaciones" && <Aprobaciones />}
         {active === "estados" && <EstadosCuenta />}
         {active === "resumen" && <ResumenAnual naves={naves} pagos={pagos} />}
       </main>
