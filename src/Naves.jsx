@@ -122,7 +122,7 @@ function EditarNaveModal({ nave, onClose, onSave }) {
   );
 }
 
-export default function Naves({ naves, setNaves }) {
+export default function Naves({ naves, setNaves, rol, usuarioEmail }) {
   const [inmuebles, setInmuebles] = useState([]);
   const [editando, setEditando] = useState(null);
   const [modalInmueble, setModalInmueble] = useState(false);
@@ -146,6 +146,7 @@ export default function Naves({ naves, setNaves }) {
       tipo_movimiento: "inmueble",
       nombre,
       fecha_captura: new Date().toISOString(),
+      capturado_por: usuarioEmail,
     });
     await registrarAuditoria({ tipo: "alta", modulo: "inmuebles", descripcion: `Inmueble enviado a aprobación: ${nombre}`, detalle: null });
     alert("Inmueble enviado a aprobaciones ✅");
@@ -161,6 +162,7 @@ export default function Naves({ naves, setNaves }) {
       inquilino: "",
       mantenimiento: false,
       fecha_captura: new Date().toISOString(),
+      capturado_por: usuarioEmail,
     });
     await registrarAuditoria({ tipo: "alta", modulo: "naves", descripcion: `Nave enviada a aprobación: ${nombre} — ${m2} m²`, detalle: { inmueble_id } });
     alert("Nave enviada a aprobaciones ✅");

@@ -52,7 +52,6 @@ function cargarCuentas(setCuentas) {
   });
 }
 
-// ─── MODAL EDITAR PAGO ────────────────────────────────────────────────────────
 function EditarPagoModal({ pago, pagoKey, onClose }) {
   const [cuentas, setCuentas] = useState([]);
   const [form, setForm] = useState({ ...pago });
@@ -102,7 +101,6 @@ function EditarPagoModal({ pago, pagoKey, onClose }) {
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#4E6080", cursor: "pointer", fontSize: 20 }}>x</button>
         </div>
         <div style={{ padding: "20px 24px" }}>
-
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
             <div>
               <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Monto base ($)</label>
@@ -115,7 +113,6 @@ function EditarPagoModal({ pago, pagoKey, onClose }) {
                 style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box" }} />
             </div>
           </div>
-
           <div style={{ marginBottom: 14 }}>
             <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Metodo de pago</label>
             <select value={form.metodo || "Transferencia"} onChange={e => set("metodo", e.target.value)}
@@ -123,7 +120,6 @@ function EditarPagoModal({ pago, pagoKey, onClose }) {
               {["Transferencia", "Efectivo", "Cheque", "Deposito", "Otro"].map(m => <option key={m}>{m}</option>)}
             </select>
           </div>
-
           <div style={{ marginBottom: 14 }}>
             <label style={{ display: "block", fontSize: 12, color: "#00C896", marginBottom: 5, fontWeight: 600 }}>Cuenta destino</label>
             <select value={form.cuenta_id || ""} onChange={e => seleccionarCuenta(e.target.value)}
@@ -133,7 +129,6 @@ function EditarPagoModal({ pago, pagoKey, onClose }) {
               ))}
             </select>
           </div>
-
           <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>Impuestos y retenciones</div>
           {[
             { label: "IVA", sub: "Impuesto al valor agregado", ka: "aplica_iva", kp: "pct_iva", def: 16 },
@@ -155,7 +150,6 @@ function EditarPagoModal({ pago, pagoKey, onClose }) {
               </div>
             </div>
           ))}
-
           <div style={{ background: "#0A0E17", borderRadius: 10, border: "1px solid #1E2740", padding: "12px 14px", marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: "#4E6080", fontWeight: 700, marginBottom: 8 }}>CALCULO</div>
             {[
@@ -175,18 +169,14 @@ function EditarPagoModal({ pago, pagoKey, onClose }) {
               <span style={{ color: "#00C896", fontWeight: 800 }}>{fmt(montoNeto)}</span>
             </div>
           </div>
-
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Notas</label>
             <input value={form.notas || ""} onChange={e => set("notas", e.target.value)} placeholder="Referencia, observaciones..."
               style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box" }} />
           </div>
-
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onClose} style={{ flex: 1, background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#4E6080", padding: 11, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
-            <button onClick={guardar} style={{ flex: 2, background: "linear-gradient(135deg, #00C896, #4E8CFF)", border: "none", borderRadius: 8, color: "#fff", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-              Guardar cambios
-            </button>
+            <button onClick={guardar} style={{ flex: 2, background: "linear-gradient(135deg, #00C896, #4E8CFF)", border: "none", borderRadius: 8, color: "#fff", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Guardar cambios</button>
           </div>
         </div>
       </div>
@@ -194,16 +184,13 @@ function EditarPagoModal({ pago, pagoKey, onClose }) {
   );
 }
 
-// ─── MODAL REGISTRAR PAGO ─────────────────────────────────────────────────────
 function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
   const fechaHoy = new Date().toISOString().split("T")[0];
   const [cuentas, setCuentas] = useState([CUENTA_EFECTIVO]);
   const [form, setForm] = useState({
     fecha: fechaHoy, metodo: "Transferencia",
     cuenta_id: "efectivo", cuenta_nombre: "Efectivo — Caja general", notas: "",
-    aplica_iva: true, pct_iva: 16,
-    aplica_ret_iva: true, pct_ret_iva: 10.67,
-    aplica_ret_isr: true, pct_ret_isr: 10,
+    aplica_iva: true, pct_iva: 16, aplica_ret_iva: true, pct_ret_iva: 10.67, aplica_ret_isr: true, pct_ret_isr: 10,
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const mesesDeuda = getMesesDeuda(inquilino.empresa, pagos, inquilino.renta);
@@ -270,12 +257,10 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
               );
             })}
           </div>
-
           <div style={{ background: "#0D2E1F", border: "1px solid #00C89633", borderRadius: 10, padding: "10px 14px", marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: "#00C896", fontWeight: 600, marginBottom: 4 }}>APLICANDO A: {mesAplicar}</div>
             <div style={{ fontSize: 12, color: "#4E6080" }}>Pendiente: ${saldoPendiente.toLocaleString()}{abonoPrevio > 0 && ` · Ya abonado: $${abonoPrevio.toLocaleString()}`}</div>
           </div>
-
           <div style={{ marginBottom: 14 }}>
             <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Monto del abono ($)</label>
             <input value={montoAbono} onChange={e => setMontoAbono(Number(e.target.value))} type="number"
@@ -284,7 +269,6 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
               {esCompleto ? "Pago completo" : `Abono parcial — queda pendiente: $${(saldoPendiente - montoAbono).toLocaleString()}`}
             </div>
           </div>
-
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
             <div>
               <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Fecha de pago</label>
@@ -299,7 +283,6 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
               </select>
             </div>
           </div>
-
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: "block", fontSize: 12, color: "#00C896", marginBottom: 5, fontWeight: 600 }}>Cuenta destino</label>
             <select value={form.cuenta_id} onChange={e => seleccionarCuenta(e.target.value)}
@@ -309,7 +292,6 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
               ))}
             </select>
           </div>
-
           <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>Impuestos y retenciones</div>
           {[
             { label: "IVA", sub: "Impuesto al valor agregado", ka: "aplica_iva", kp: "pct_iva" },
@@ -331,7 +313,6 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
               </div>
             </div>
           ))}
-
           <div style={{ background: "#0A0E17", borderRadius: 10, border: "1px solid #1E2740", padding: "14px", marginTop: 4, marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: "#4E6080", fontWeight: 700, marginBottom: 10 }}>CALCULO</div>
             {[
@@ -351,13 +332,11 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
               <span style={{ color: "#00C896", fontWeight: 800 }}>{fmt(montoNeto)}</span>
             </div>
           </div>
-
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Notas (opcional)</label>
             <input value={form.notas} onChange={e => set("notas", e.target.value)} placeholder="Referencia..."
               style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box" }} />
           </div>
-
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onClose} style={{ flex: 1, background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#4E6080", padding: 11, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
             <button onClick={() => {
@@ -373,13 +352,10 @@ function RegistrarPagoModal({ inquilino, pagos, onClose, onSave }) {
   );
 }
 
-// ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
-export default function CuentasPorCobrar({ naves, pagos }) {
+export default function CuentasPorCobrar({ naves, pagos, rol, usuarioEmail }) {
   const [registrando, setRegistrando] = useState(null);
   const [editandoPago, setEditandoPago] = useState(null);
   const [confirmBorrar, setConfirmBorrar] = useState(null);
-  const [mesFiltro, setMesFiltro] = useState(MES_ACTUAL);
-  const [mesVisible, setMesVisible] = useState(Math.max(0, TODOS_LOS_MESES.length - 4));
   const [inmuebles, setInmuebles] = useState([]);
   const [vistaActiva, setVistaActiva] = useState("deuda");
 
@@ -390,7 +366,6 @@ export default function CuentasPorCobrar({ naves, pagos }) {
     return () => unsub();
   }, []);
 
-  const mesesVisibles = TODOS_LOS_MESES.slice(mesVisible, mesVisible + 4);
   const inquilinos = getInquilinos(naves, inmuebles);
 
   const registrarPago = async (empresa, data) => {
@@ -400,6 +375,7 @@ export default function CuentasPorCobrar({ naves, pagos }) {
       tipo_movimiento: "pago",
       aprobado: false,
       fecha_captura: new Date().toISOString(),
+      capturado_por: usuarioEmail,
     });
     await registrarAuditoria({ tipo: "alta", modulo: "pagos", descripcion: `Pago enviado a aprobacion: ${empresa} — ${data.mes} — $${Number(data.monto_base || 0).toLocaleString()}`, detalle: { cuenta: data.cuenta_nombre } });
     alert("Pago enviado a aprobacion");
@@ -421,7 +397,6 @@ export default function CuentasPorCobrar({ naves, pagos }) {
     return { ...inq, mesesDeuda, mesOldest, saldoOldest, totalDeuda };
   });
 
-  // Pagos registrados para vista de historial
   const pagosRegistrados = Object.entries(pagos)
     .filter(([, p]) => p.estado === "pagado" || p.estado === "parcial")
     .map(([key, p]) => ({ key, ...p }))
@@ -459,7 +434,6 @@ export default function CuentasPorCobrar({ naves, pagos }) {
         Mes actual: <span style={{ color: "#4E8CFF", fontWeight: 600 }}>{MES_ACTUAL}</span>
       </div>
 
-      {/* Tabs */}
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
         {[["deuda","Estado de deuda"],["historial","Historial de pagos"]].map(([id, label]) => (
           <button key={id} onClick={() => setVistaActiva(id)} style={{ padding: "8px 16px", borderRadius: 8, border: `1px solid ${vistaActiva === id ? "#4E8CFF" : "#1E2740"}`, background: vistaActiva === id ? "#0D1A2E" : "#0F1520", color: vistaActiva === id ? "#4E8CFF" : "#4E6080", fontSize: 13, fontWeight: vistaActiva === id ? 700 : 400, cursor: "pointer" }}>
@@ -477,7 +451,7 @@ export default function CuentasPorCobrar({ naves, pagos }) {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#080C14" }}>
-                {["Inquilino", "Mes mas antiguo", "Saldo pendiente", "Total adeudo", "Accion"].map(h => (
+                {["Inquilino","Mes mas antiguo","Saldo pendiente","Total adeudo","Accion"].map(h => (
                   <th key={h} style={{ padding: "10px 16px", fontSize: 11, color: "#3A5070", textAlign: "left", fontWeight: 600, textTransform: "uppercase" }}>{h}</th>
                 ))}
               </tr>
@@ -532,7 +506,7 @@ export default function CuentasPorCobrar({ naves, pagos }) {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "#080C14" }}>
-                  {["Fecha", "Inquilino", "Periodo", "Monto base", "Entra a cuenta", "Estado", "Acciones"].map(h => (
+                  {["Fecha","Inquilino","Periodo","Monto base","Entra a cuenta","Estado","Acciones"].map(h => (
                     <th key={h} style={{ padding: "10px 16px", fontSize: 11, color: "#3A5070", textAlign: "left", fontWeight: 600, textTransform: "uppercase" }}>{h}</th>
                   ))}
                 </tr>
@@ -547,9 +521,7 @@ export default function CuentasPorCobrar({ naves, pagos }) {
                     <td style={{ padding: "12px 16px", fontSize: 12, color: "#4E6080" }}>{p.mes}</td>
                     <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700, color: "#C8D8F0" }}>${Number(p.monto_base || 0).toLocaleString()}</td>
                     <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700, color: "#00C896" }}>${Number(p.monto || 0).toLocaleString()}</td>
-                    <td style={{ padding: "12px 16px" }}>
-                      <Badge estado={p.estado} tipo="pago" />
-                    </td>
+                    <td style={{ padding: "12px 16px" }}><Badge estado={p.estado} tipo="pago" /></td>
                     <td style={{ padding: "12px 16px" }}>
                       <div style={{ display: "flex", gap: 6 }}>
                         <button onClick={() => setEditandoPago({ key: p.key, pago: p })} style={{ background: "#1A2535", border: "1px solid #1E2740", borderRadius: 6, color: "#4E8CFF", padding: "5px 10px", fontSize: 11, cursor: "pointer", fontWeight: 600 }}>Editar</button>

@@ -83,7 +83,7 @@ function ModalGasto({ inicial, onClose, onSave }) {
   );
 }
 
-export default function Gastos() {
+export default function Gastos({ rol, usuarioEmail }) {
   const [gastos, setGastos] = useState([]);
   const [modalNuevo, setModalNuevo] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -114,19 +114,18 @@ export default function Gastos() {
     return () => unsub();
   }, []);
 
-  // Nuevo gasto va a PENDIENTES para aprobacion
   const agregar = async (data) => {
     await addDoc(collection(db, "pendientes"), {
       ...data,
       tipo_movimiento: "gasto",
       aprobado: false,
       fecha_captura: new Date().toISOString(),
+      capturado_por: usuarioEmail,
     });
     await registrarAuditoria({ tipo: "alta", modulo: "gastos", descripcion: `Gasto enviado a aprobacion: ${data.concepto} — $${Number(data.monto).toLocaleString()}`, detalle: { cuenta: data.cuenta_nombre } });
     alert("Gasto enviado a aprobacion");
   };
 
-  // Editar gasto ya aprobado (directo en gastos)
   const editar = async (data) => {
     const anterior = editando;
     await updateDoc(doc(db, "gastos", editando.id), { ...data, monto: Number(data.monto) });

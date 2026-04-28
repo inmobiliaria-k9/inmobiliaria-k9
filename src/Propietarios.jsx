@@ -108,7 +108,7 @@ function FormPropietario({ inicial, inmuebles, onGuardar, onCancelar }) {
   );
 }
 
-export default function Propietarios() {
+export default function Propietarios({ rol, usuarioEmail }) {
   const [propietarios, setPropietarios] = useState([]);
   const [inmuebles, setInmuebles] = useState([]);
   const [modalNuevo, setModalNuevo] = useState(false);
@@ -131,6 +131,7 @@ export default function Propietarios() {
       ...form,
       tipo_movimiento: "propietario",
       fecha_captura: new Date().toISOString(),
+      capturado_por: usuarioEmail,
     });
     await registrarAuditoria({
       tipo: "alta",

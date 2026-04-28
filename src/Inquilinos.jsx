@@ -72,7 +72,6 @@ function FormInquilino({ inicial, naves, onGuardar, onCancelar }) {
       </div>
 
       <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 700, marginBottom: 10, marginTop: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>Nave asignada</div>
-
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
         <div style={{ marginBottom: 12 }}>
           <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Inmueble</label>
@@ -93,7 +92,6 @@ function FormInquilino({ inicial, naves, onGuardar, onCancelar }) {
       </div>
 
       <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 700, marginBottom: 10, marginTop: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>Contrato</div>
-
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
         <div>{inp("Fecha inicio", "fecha_inicio", "date")}</div>
         <div>{inp("Fecha fin", "fecha_fin", "date")}</div>
@@ -122,7 +120,7 @@ function FormInquilino({ inicial, naves, onGuardar, onCancelar }) {
   );
 }
 
-export default function Inquilinos() {
+export default function Inquilinos({ rol, usuarioEmail }) {
   const [inquilinos, setInquilinos] = useState([]);
   const [naves, setNaves] = useState([]);
   const [modalNuevo, setModalNuevo] = useState(false);
@@ -148,10 +146,10 @@ export default function Inquilinos() {
       ...form,
       tipo_movimiento: "inquilino",
       fecha_captura: new Date().toISOString(),
+      capturado_por: usuarioEmail,
     });
     await registrarAuditoria({
-      tipo: "alta",
-      modulo: "inquilinos",
+      tipo: "alta", modulo: "inquilinos",
       descripcion: `Inquilino enviado a aprobación: ${form.alias}`,
       detalle: { razon_social: form.razon_social, rfc: form.rfc },
     });
@@ -163,8 +161,7 @@ export default function Inquilinos() {
     const anterior = editando;
     await updateDoc(doc(db, "inquilinos", editando.id), form);
     await registrarAuditoria({
-      tipo: "edicion",
-      modulo: "inquilinos",
+      tipo: "edicion", modulo: "inquilinos",
       descripcion: `Inquilino editado: ${form.alias}`,
       detalle: { anterior: { alias: anterior.alias, nave_id: anterior.nave_id }, nuevo: { alias: form.alias, nave_id: form.nave_id } },
     });
@@ -175,8 +172,7 @@ export default function Inquilinos() {
     const inq = inquilinos.find(i => i.id === id);
     await deleteDoc(doc(db, "inquilinos", id));
     await registrarAuditoria({
-      tipo: "borrado",
-      modulo: "inquilinos",
+      tipo: "borrado", modulo: "inquilinos",
       descripcion: `Inquilino borrado: ${inq?.alias}`,
       detalle: { razon_social: inq?.razon_social },
     });
@@ -296,7 +292,6 @@ export default function Inquilinos() {
                     <button onClick={() => setConfirmBorrar(inq)} style={{ background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 6, color: "#FF5C5C", padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>🗑️</button>
                   </div>
                 </div>
-
                 <div style={{ padding: "14px 18px" }}>
                   {nave && (
                     <div style={{ background: "#0A0E17", borderRadius: 8, padding: "8px 12px", border: "1px solid #1E2740", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>

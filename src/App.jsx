@@ -241,11 +241,11 @@ export default function App() {
 
       <main style={{ flex: 1, overflow: "auto" }}>
         {active === "dashboard"    && esDirector && <Dashboard naves={naves} pagos={pagos} />}
-        {active === "propietarios" && <Propietarios rol={rol} />}
-        {active === "naves"        && <Naves naves={naves} setNaves={setNaves} rol={rol} />}
-        {active === "inquilinos"   && <Inquilinos rol={rol} />}
-        {active === "cobrar"       && <CuentasPorCobrar naves={naves} pagos={pagos} rol={rol} />}
-        {active === "gastos"       && <Gastos rol={rol} />}
+        {active === "propietarios" && <Propietarios rol={rol} usuarioEmail={usuario.email} />}
+        {active === "naves"        && <Naves naves={naves} setNaves={setNaves} rol={rol} usuarioEmail={usuario.email} />}
+        {active === "inquilinos"   && <Inquilinos rol={rol} usuarioEmail={usuario.email} />}
+        {active === "cobrar"       && <CuentasPorCobrar naves={naves} pagos={pagos} rol={rol} usuarioEmail={usuario.email} />}
+        {active === "gastos"       && <Gastos rol={rol} usuarioEmail={usuario.email} />}
         {active === "aprobaciones" && esDirector && <Aprobaciones />}
         {active === "auditoria"    && esDirector && <Auditoria />}
         {active === "estados"      && <EstadosCuenta rol={rol} />}
