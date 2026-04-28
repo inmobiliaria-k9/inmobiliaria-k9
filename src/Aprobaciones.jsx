@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
-import { collection, onSnapshot, doc, deleteDoc, setDoc, addDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, deleteDoc, setDoc, addDoc, getDoc } from "firebase/firestore";
 import { registrarAuditoria } from "./auditoria";
 
 export default function Aprobaciones() {
@@ -23,9 +23,24 @@ export default function Aprobaciones() {
     try {
       if (item.tipo_movimiento === "pago") {
         const key = `${item.empresa.replace(/\s+/g, "_")}__${item.mes.replace(/\s+/g, "_")}`;
-        await setDoc(doc(db, "pagos", key), {
-          empresa: item.empresa, mes: item.mes, estado: item.estado,
-          fecha: item.fecha, monto: item.monto, monto_base: item.monto_base,
+        const pagoRef = doc(db, "pagos", key);
+        const pagoExistente = await getDoc(pagoRef);
+
+        let montoBaseTotal = Number(item.monto_base || 0);
+        let montoNetoTotal = Number(item.monto || 0);
+
+        if (pagoExistente.exists()) {
+          const data = pagoExistente.data();
+          montoBaseTotal += Number(data.monto_base || 0);
+          montoNetoTotal += Number(data.monto || 0);
+        }
+
+        const esCompleto = montoBaseTotal >= Number(item.monto_base || 0);
+
+        await setDoc(pagoRef, {
+          empresa: item.empresa, mes: item.mes,
+          estado: montoBaseTotal >= item.monto_base ? "pagado" : "parcial",
+          fecha: item.fecha, monto: montoNetoTotal, monto_base: montoBaseTotal,
           metodo: item.metodo, cuenta_id: item.cuenta_id, cuenta_nombre: item.cuenta_nombre,
           aplica_iva: item.aplica_iva, pct_iva: item.pct_iva,
           aplica_ret_iva: item.aplica_ret_iva, pct_ret_iva: item.pct_ret_iva,
@@ -111,12 +126,12 @@ export default function Aprobaciones() {
 
   const fmt = n => `$${Math.round(Number(n) || 0).toLocaleString()}`;
 
-  const pagosPendientes       = pendientes.filter(p => p.tipo_movimiento === "pago");
-  const gastosPendientes      = pendientes.filter(p => p.tipo_movimiento === "gasto");
+  const pagosPendientes        = pendientes.filter(p => p.tipo_movimiento === "pago");
+  const gastosPendientes       = pendientes.filter(p => p.tipo_movimiento === "gasto");
   const propietariosPendientes = pendientes.filter(p => p.tipo_movimiento === "propietario");
-  const inmueblesPendientes   = pendientes.filter(p => p.tipo_movimiento === "inmueble");
-  const navesPendientes       = pendientes.filter(p => p.tipo_movimiento === "nave");
-  const inquilinosPendientes  = pendientes.filter(p => p.tipo_movimiento === "inquilino");
+  const inmueblesPendientes    = pendientes.filter(p => p.tipo_movimiento === "inmueble");
+  const navesPendientes        = pendientes.filter(p => p.tipo_movimiento === "nave");
+  const inquilinosPendientes   = pendientes.filter(p => p.tipo_movimiento === "inquilino");
 
   const BotonesAccion = ({ item }) => (
     <div style={{ display: "flex", gap: 6 }}>
@@ -150,7 +165,6 @@ export default function Aprobaciones() {
   return (
     <div style={{ padding: "28px" }}>
 
-      {/* Modal rechazo */}
       {confirmRechazo && (
         <div style={{ position: "fixed", inset: 0, background: "#000000CC", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
           <div style={{ background: "#0F1520", borderRadius: 16, border: "1px solid #1E2740", width: "100%", maxWidth: 400, padding: 28 }}>
@@ -197,7 +211,6 @@ export default function Aprobaciones() {
         </div>
       ) : (
         <>
-          {/* Propietarios */}
           {propietariosPendientes.length > 0 && (
             <Seccion titulo={`🏢 Propietarios pendientes (${propietariosPendientes.length})`}>
               <thead><tr style={{ background: "#080C14" }}>
@@ -217,7 +230,6 @@ export default function Aprobaciones() {
             </Seccion>
           )}
 
-          {/* Inmuebles */}
           {inmueblesPendientes.length > 0 && (
             <Seccion titulo={`🏭 Inmuebles pendientes (${inmueblesPendientes.length})`}>
               <thead><tr style={{ background: "#080C14" }}>
@@ -235,7 +247,6 @@ export default function Aprobaciones() {
             </Seccion>
           )}
 
-          {/* Naves */}
           {navesPendientes.length > 0 && (
             <Seccion titulo={`🏗️ Naves pendientes (${navesPendientes.length})`}>
               <thead><tr style={{ background: "#080C14" }}>
@@ -254,7 +265,6 @@ export default function Aprobaciones() {
             </Seccion>
           )}
 
-          {/* Inquilinos */}
           {inquilinosPendientes.length > 0 && (
             <Seccion titulo={`👥 Inquilinos pendientes (${inquilinosPendientes.length})`}>
               <thead><tr style={{ background: "#080C14" }}>
@@ -274,7 +284,6 @@ export default function Aprobaciones() {
             </Seccion>
           )}
 
-          {/* Pagos */}
           {pagosPendientes.length > 0 && (
             <Seccion titulo={`💰 Pagos pendientes (${pagosPendientes.length})`}>
               <thead><tr style={{ background: "#080C14" }}>
@@ -296,7 +305,6 @@ export default function Aprobaciones() {
             </Seccion>
           )}
 
-          {/* Gastos */}
           {gastosPendientes.length > 0 && (
             <Seccion titulo={`📝 Gastos pendientes (${gastosPendientes.length})`}>
               <thead><tr style={{ background: "#080C14" }}>
