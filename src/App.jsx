@@ -17,17 +17,30 @@ import Auditoria from "./Auditoria.jsx";
 
 const auth = getAuth();
 
+// ─── ROLES ────────────────────────────────────────────────────────────────────
+const DIRECTORES = [
+  "kananjose9@gmail.com",
+];
+
+function getRol(email) {
+  if (!email) return "administrador";
+  if (DIRECTORES.includes(email.toLowerCase())) return "director";
+  return "administrador";
+}
+
+const BLOQUEADOS_ADMIN = ["dashboard", "aprobaciones", "auditoria"];
+
 const navItems = [
-  { id: "dashboard", label: "Dashboard", icon: "▦" },
-  { id: "propietarios", label: "Propietarios", icon: "🏢" },
-  { id: "naves", label: "Inmuebles y Naves", icon: "🏭" },
-  { id: "inquilinos", label: "Inquilinos", icon: "👥" },
-  { id: "cobrar", label: "Cuentas por Cobrar", icon: "💳" },
-  { id: "gastos", label: "Gastos", icon: "📋" },
-  { id: "aprobaciones", label: "Aprobaciones", icon: "✅" },
-  { id: "auditoria", label: "Auditoria", icon: "📋" },
-  { id: "estados", label: "Estados de Cuenta", icon: "🏦" },
-  { id: "resumen", label: "Resumen Anual", icon: "📊" },
+  { id: "dashboard",    label: "Dashboard",          icon: "▦",  soloDirector: true  },
+  { id: "propietarios", label: "Propietarios",        icon: "🏢", soloDirector: false },
+  { id: "naves",        label: "Inmuebles y Naves",   icon: "🏭", soloDirector: false },
+  { id: "inquilinos",   label: "Inquilinos",          icon: "👥", soloDirector: false },
+  { id: "cobrar",       label: "Cuentas por Cobrar",  icon: "💳", soloDirector: false },
+  { id: "gastos",       label: "Gastos",              icon: "📋", soloDirector: false },
+  { id: "aprobaciones", label: "Aprobaciones",        icon: "✅", soloDirector: true  },
+  { id: "auditoria",    label: "Auditoria",           icon: "🔍", soloDirector: true  },
+  { id: "estados",      label: "Estados de Cuenta",   icon: "🏦", soloDirector: false },
+  { id: "resumen",      label: "Resumen Anual",       icon: "📊", soloDirector: false },
 ];
 
 function usePagos() {
@@ -46,7 +59,7 @@ function usePagos() {
 export default function App() {
   const [usuario, setUsuario] = useState(null);
   const [verificando, setVerificando] = useState(true);
-  const [active, setActive] = useState("dashboard");
+  const [active, setActive] = useState(null);
   const [naves, setNaves] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [migrando, setMigrando] = useState(false);
@@ -60,6 +73,12 @@ export default function App() {
     });
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    if (!usuario) return;
+    const rol = getRol(usuario.email);
+    setActive(rol === "director" ? "dashboard" : "propietarios");
+  }, [usuario]);
 
   useEffect(() => {
     if (!usuario) return;
@@ -150,6 +169,19 @@ export default function App() {
     </div>
   );
 
+  const rol = getRol(usuario.email);
+  const esDirector = rol === "director";
+
+  if (!esDirector && BLOQUEADOS_ADMIN.includes(active)) {
+    return (
+      <div style={{ display: "flex", minHeight: "100vh", background: "#0A0E17", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>
+        <div style={{ fontSize: 48 }}>🔒</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: "#E8EDF5" }}>Acceso restringido</div>
+        <div style={{ fontSize: 13, color: "#4E6080" }}>No tienes permiso para ver esta sección</div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#0A0E17", fontFamily: "'DM Sans','Segoe UI',sans-serif", color: "#E8EDF5" }}>
       <aside style={{ width: 240, background: "#0F1520", borderRight: "1px solid #1E2740", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh" }}>
@@ -162,12 +194,15 @@ export default function App() {
         </div>
 
         <nav style={{ flex: 1, padding: "12px 8px", overflowY: "auto" }}>
-          {navItems.map(item => (
-            <button key={item.id} onClick={() => setActive(item.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 8, border: "none", cursor: "pointer", textAlign: "left", width: "100%", background: active === item.id ? "rgba(0,200,150,0.1)" : "transparent", color: active === item.id ? "#00C896" : "#5A7090", borderLeft: active === item.id ? "2px solid #00C896" : "2px solid transparent", fontSize: 13, fontWeight: active === item.id ? 600 : 400, marginBottom: 2 }}>
-              <span style={{ fontSize: 16 }}>{item.icon}</span>
-              {item.label}
-            </button>
-          ))}
+          {navItems
+            .filter(item => esDirector || !item.soloDirector)
+            .map(item => (
+              <button key={item.id} onClick={() => setActive(item.id)}
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 8, border: "none", cursor: "pointer", textAlign: "left", width: "100%", background: active === item.id ? "rgba(0,200,150,0.1)" : "transparent", color: active === item.id ? "#00C896" : "#5A7090", borderLeft: active === item.id ? "2px solid #00C896" : "2px solid transparent", fontSize: 13, fontWeight: active === item.id ? 600 : 400, marginBottom: 2 }}>
+                <span style={{ fontSize: 16 }}>{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
 
           {navesConIdNumerico.length > 0 && (
             <button onClick={migrarInmuebles} disabled={migrandoInmuebles}
@@ -193,7 +228,9 @@ export default function App() {
             </div>
             <div>
               <div style={{ fontSize: 12, fontWeight: 600, color: "#C8D8F0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 140 }}>{usuario.email}</div>
-              <div style={{ fontSize: 11, color: "#3A5070" }}>{MES_ACTUAL}</div>
+              <div style={{ fontSize: 11, color: esDirector ? "#00C896" : "#4E8CFF", fontWeight: 600 }}>
+                {esDirector ? "Director" : "Administrador"}
+              </div>
             </div>
           </div>
           <button onClick={handleLogout} style={{ width: "100%", background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#FF5C5C", padding: "8px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
@@ -203,16 +240,16 @@ export default function App() {
       </aside>
 
       <main style={{ flex: 1, overflow: "auto" }}>
-        {active === "dashboard" && <Dashboard naves={naves} pagos={pagos} />}
-        {active === "propietarios" && <Propietarios />}
-        {active === "naves" && <Naves naves={naves} setNaves={setNaves} />}
-        {active === "inquilinos" && <Inquilinos />}
-        {active === "cobrar" && <CuentasPorCobrar naves={naves} pagos={pagos} />}
-        {active === "gastos" && <Gastos />}
-        {active === "aprobaciones" && <Aprobaciones />}
-        {active === "auditoria" && <Auditoria />}
-        {active === "estados" && <EstadosCuenta />}
-        {active === "resumen" && <ResumenAnual naves={naves} pagos={pagos} />}
+        {active === "dashboard"    && esDirector && <Dashboard naves={naves} pagos={pagos} />}
+        {active === "propietarios" && <Propietarios rol={rol} />}
+        {active === "naves"        && <Naves naves={naves} setNaves={setNaves} rol={rol} />}
+        {active === "inquilinos"   && <Inquilinos rol={rol} />}
+        {active === "cobrar"       && <CuentasPorCobrar naves={naves} pagos={pagos} rol={rol} />}
+        {active === "gastos"       && <Gastos rol={rol} />}
+        {active === "aprobaciones" && esDirector && <Aprobaciones />}
+        {active === "auditoria"    && esDirector && <Auditoria />}
+        {active === "estados"      && <EstadosCuenta rol={rol} />}
+        {active === "resumen"      && <ResumenAnual naves={naves} pagos={pagos} rol={rol} />}
       </main>
     </div>
   );
