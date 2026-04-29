@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
-import { collection, onSnapshot, doc, deleteDoc, setDoc, addDoc, getDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, deleteDoc, setDoc, addDoc, getDoc, updateDoc } from "firebase/firestore";
 import { registrarAuditoria } from "./auditoria";
 
 export default function Aprobaciones() {
@@ -25,18 +25,13 @@ export default function Aprobaciones() {
         const key = `${item.empresa.replace(/\s+/g, "_")}__${item.mes.replace(/\s+/g, "_")}`;
         const pagoRef = doc(db, "pagos", key);
         const pagoExistente = await getDoc(pagoRef);
-
         let montoBaseTotal = Number(item.monto_base || 0);
         let montoNetoTotal = Number(item.monto || 0);
-
         if (pagoExistente.exists()) {
           const data = pagoExistente.data();
           montoBaseTotal += Number(data.monto_base || 0);
           montoNetoTotal += Number(data.monto || 0);
         }
-
-        const esCompleto = montoBaseTotal >= Number(item.monto_base || 0);
-
         await setDoc(pagoRef, {
           empresa: item.empresa, mes: item.mes,
           estado: montoBaseTotal >= item.monto_base ? "pagado" : "parcial",
@@ -77,6 +72,32 @@ export default function Aprobaciones() {
           fecha_inicio: item.fecha_inicio || "", fecha_fin: item.fecha_fin || "",
           notas: item.notas || "", aprobado: true,
         });
+      } else if (item.tipo_movimiento === "incremento") {
+        // Actualizar renta en la nave
+        if (item.nave_id) {
+          await updateDoc(doc(db, "naves", item.nave_id), {
+            renta: item.renta_nueva,
+          });
+        }
+        // Actualizar fecha_incremento en el inquilino
+        if (item.inquilino_id) {
+          await updateDoc(doc(db, "inquilinos", item.inquilino_id), {
+            renta_nueva: item.renta_nueva,
+            fecha_incremento: item.fecha_incremento,
+          });
+        }
+        // Guardar historial del incremento
+        await addDoc(collection(db, "incrementos"), {
+          inquilino_id: item.inquilino_id,
+          inquilino_alias: item.inquilino_alias,
+          nave_id: item.nave_id,
+          renta_anterior: item.renta_actual,
+          renta_nueva: item.renta_nueva,
+          fecha_incremento: item.fecha_incremento,
+          notas: item.notas_incremento || "",
+          fecha_aprobacion: new Date().toISOString(),
+          aprobado: true,
+        });
       }
 
       await deleteDoc(doc(db, "pendientes", item.id));
@@ -89,7 +110,8 @@ export default function Aprobaciones() {
           : item.tipo_movimiento === "propietario" ? `Propietario aprobado: ${item.nombre}`
           : item.tipo_movimiento === "inmueble" ? `Inmueble aprobado: ${item.nombre}`
           : item.tipo_movimiento === "nave" ? `Nave aprobada: ${item.nombre}`
-          : `Inquilino aprobado: ${item.alias}`,
+          : item.tipo_movimiento === "inquilino" ? `Inquilino aprobado: ${item.alias}`
+          : `Incremento aprobado: ${item.inquilino_alias} — $${Number(item.renta_actual).toLocaleString()} → $${Number(item.renta_nueva).toLocaleString()}`,
         detalle: null,
       });
     } catch (e) {
@@ -110,7 +132,8 @@ export default function Aprobaciones() {
         : item.tipo_movimiento === "propietario" ? `Propietario rechazado: ${item.nombre}`
         : item.tipo_movimiento === "inmueble" ? `Inmueble rechazado: ${item.nombre}`
         : item.tipo_movimiento === "nave" ? `Nave rechazada: ${item.nombre}`
-        : `Inquilino rechazado: ${item.alias}`,
+        : item.tipo_movimiento === "inquilino" ? `Inquilino rechazado: ${item.alias}`
+        : `Incremento rechazado: ${item.inquilino_alias}`,
       detalle: nota ? { motivo: nota } : null,
     });
     setConfirmRechazo(null);
@@ -132,6 +155,7 @@ export default function Aprobaciones() {
   const inmueblesPendientes    = pendientes.filter(p => p.tipo_movimiento === "inmueble");
   const navesPendientes        = pendientes.filter(p => p.tipo_movimiento === "nave");
   const inquilinosPendientes   = pendientes.filter(p => p.tipo_movimiento === "inquilino");
+  const incrementosPendientes  = pendientes.filter(p => p.tipo_movimiento === "incremento");
 
   const BotonesAccion = ({ item }) => (
     <div style={{ display: "flex", gap: 6 }}>
@@ -175,11 +199,12 @@ export default function Aprobaciones() {
               : confirmRechazo.tipo_movimiento === "propietario" ? `Propietario: ${confirmRechazo.nombre}`
               : confirmRechazo.tipo_movimiento === "inmueble" ? `Inmueble: ${confirmRechazo.nombre}`
               : confirmRechazo.tipo_movimiento === "nave" ? `Nave: ${confirmRechazo.nombre}`
-              : `Inquilino: ${confirmRechazo.alias}`}
+              : confirmRechazo.tipo_movimiento === "inquilino" ? `Inquilino: ${confirmRechazo.alias}`
+              : `Incremento: ${confirmRechazo.inquilino_alias}`}
             </div>
             <div style={{ marginBottom: 20 }}>
               <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 6, fontWeight: 600 }}>Motivo del rechazo (opcional)</label>
-              <input value={notaRechazo} onChange={e => setNotaRechazo(e.target.value)} placeholder="Ej. Datos incorrectos, duplicado..."
+              <input value={notaRechazo} onChange={e => setNotaRechazo(e.target.value)} placeholder="Ej. Datos incorrectos..."
                 style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box" }} />
             </div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -211,6 +236,34 @@ export default function Aprobaciones() {
         </div>
       ) : (
         <>
+          {/* Incrementos */}
+          {incrementosPendientes.length > 0 && (
+            <Seccion titulo={`📈 Incrementos de renta pendientes (${incrementosPendientes.length})`}>
+              <thead><tr style={{ background: "#080C14" }}>
+                {["Fecha captura","Inquilino","Renta actual","Renta nueva","Diferencia","Fecha incremento","Acciones"].map(h => <th key={h} style={thStyle}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {incrementosPendientes.map((p, i) => (
+                  <tr key={i} style={{ borderTop: "1px solid #141A28" }} {...trHover}>
+                    <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(p.fecha_captura?.split("T")[0])}</td>
+                    <td style={{ ...tdStyle, fontWeight: 600, color: "#C8D8F0" }}>{p.inquilino_alias}</td>
+                    <td style={{ ...tdStyle, color: "#4E6080" }}>{fmt(p.renta_actual)}</td>
+                    <td style={{ ...tdStyle, fontWeight: 700, color: "#00C896" }}>{fmt(p.renta_nueva)}</td>
+                    <td style={{ ...tdStyle, fontSize: 12, color: "#FFB547" }}>
+                      +{fmt(Number(p.renta_nueva) - Number(p.renta_actual))}
+                      <span style={{ fontSize: 11, color: "#3A5070", marginLeft: 4 }}>
+                        ({(((Number(p.renta_nueva) - Number(p.renta_actual)) / Number(p.renta_actual)) * 100).toFixed(1)}%)
+                      </span>
+                    </td>
+                    <td style={{ ...tdStyle, fontSize: 12, color: "#4E6080" }}>{formatFecha(p.fecha_incremento)}</td>
+                    <td style={tdStyle}><BotonesAccion item={p} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </Seccion>
+          )}
+
+          {/* Propietarios */}
           {propietariosPendientes.length > 0 && (
             <Seccion titulo={`🏢 Propietarios pendientes (${propietariosPendientes.length})`}>
               <thead><tr style={{ background: "#080C14" }}>
@@ -230,6 +283,7 @@ export default function Aprobaciones() {
             </Seccion>
           )}
 
+          {/* Inmuebles */}
           {inmueblesPendientes.length > 0 && (
             <Seccion titulo={`🏭 Inmuebles pendientes (${inmueblesPendientes.length})`}>
               <thead><tr style={{ background: "#080C14" }}>
@@ -247,6 +301,7 @@ export default function Aprobaciones() {
             </Seccion>
           )}
 
+          {/* Naves */}
           {navesPendientes.length > 0 && (
             <Seccion titulo={`🏗️ Naves pendientes (${navesPendientes.length})`}>
               <thead><tr style={{ background: "#080C14" }}>
@@ -265,6 +320,7 @@ export default function Aprobaciones() {
             </Seccion>
           )}
 
+          {/* Inquilinos */}
           {inquilinosPendientes.length > 0 && (
             <Seccion titulo={`👥 Inquilinos pendientes (${inquilinosPendientes.length})`}>
               <thead><tr style={{ background: "#080C14" }}>
@@ -284,6 +340,7 @@ export default function Aprobaciones() {
             </Seccion>
           )}
 
+          {/* Pagos */}
           {pagosPendientes.length > 0 && (
             <Seccion titulo={`💰 Pagos pendientes (${pagosPendientes.length})`}>
               <thead><tr style={{ background: "#080C14" }}>
@@ -305,6 +362,7 @@ export default function Aprobaciones() {
             </Seccion>
           )}
 
+          {/* Gastos */}
           {gastosPendientes.length > 0 && (
             <Seccion titulo={`📝 Gastos pendientes (${gastosPendientes.length})`}>
               <thead><tr style={{ background: "#080C14" }}>

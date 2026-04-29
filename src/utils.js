@@ -74,20 +74,20 @@ export const pagoConfig = {
 };
 
 export const inmuebles = [
-  { id: 1, nombre: "PARQUE JINT" },
-  { id: 2, nombre: "JAGÜEY" },
-  { id: 3, nombre: "PARQUE SAN LORENZO" },
-  { id: 4, nombre: "AV 15 DE MAYO" },
+  { id: "inm1", nombre: "PARQUE JINT" },
+  { id: "inm2", nombre: "JAGÜEY" },
+  { id: "inm3", nombre: "PARQUE SAN LORENZO" },
+  { id: "inm4", nombre: "AV 15 DE MAYO" },
 ];
 
 export const navesIniciales = [
-  { id: "nave1", inmueble_id: 1, nombre: "NAVE 1", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
-  { id: "nave2", inmueble_id: 1, nombre: "NAVE 2", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
-  { id: "nave3", inmueble_id: 1, nombre: "NAVE 3", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
-  { id: "nave4", inmueble_id: 1, nombre: "NAVE 4", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
-  { id: "nave5", inmueble_id: 1, nombre: "NAVE 5", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
-  { id: "nave6", inmueble_id: 3, nombre: "NAVE 1", m2: 948,  renta: 0, inquilino: "", mantenimiento: false },
-  { id: "nave7", inmueble_id: 3, nombre: "NAVE 2", m2: 1054, renta: 0, inquilino: "", mantenimiento: false },
-  { id: "nave8", inmueble_id: 4, nombre: "15 DE MAYO", m2: 4479, renta: 0, inquilino: "", mantenimiento: false },
-  { id: "nave9", inmueble_id: 2, nombre: "JAGUEY", m2: 4479, renta: 0, inquilino: "", mantenimiento: false },
+  { id: "nave1", inmueble_id: "inm1", nombre: "NAVE 1", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
+  { id: "nave2", inmueble_id: "inm1", nombre: "NAVE 2", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
+  { id: "nave3", inmueble_id: "inm1", nombre: "NAVE 3", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
+  { id: "nave4", inmueble_id: "inm1", nombre: "NAVE 4", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
+  { id: "nave5", inmueble_id: "inm1", nombre: "NAVE 5", m2: 1090, renta: 0, inquilino: "", mantenimiento: false },
+  { id: "nave6", inmueble_id: "inm3", nombre: "NAVE 1", m2: 948,  renta: 0, inquilino: "", mantenimiento: false },
+  { id: "nave7", inmueble_id: "inm3", nombre: "NAVE 2", m2: 1054, renta: 0, inquilino: "", mantenimiento: false },
+  { id: "nave8", inmueble_id: "inm4", nombre: "15 DE MAYO", m2: 4479, renta: 0, inquilino: "", mantenimiento: false },
+  { id: "nave9", inmueble_id: "inm2", nombre: "JAGUEY", m2: 4479, renta: 0, inquilino: "", mantenimiento: false },
 ];

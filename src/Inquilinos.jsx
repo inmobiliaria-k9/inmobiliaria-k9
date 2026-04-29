@@ -44,7 +44,6 @@ function FormInquilino({ inicial, naves, onGuardar, onCancelar }) {
   const [form, setForm] = useState(inicial || empty);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  // FIX — comparar como strings para evitar problemas de tipo
   const navesFiltradas = form.inmueble_id
     ? naves.filter(n => String(n.inmueble_id) === String(form.inmueble_id))
     : naves;
@@ -105,8 +104,20 @@ function FormInquilino({ inicial, naves, onGuardar, onCancelar }) {
         </div>
       )}
 
+      <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 700, marginBottom: 10, marginTop: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>Incremento de renta</div>
+      <div style={{ background: "#0A0E17", borderRadius: 10, padding: "14px", border: "1px solid #1E2740", marginBottom: 12 }}>
+        <div style={{ fontSize: 12, color: "#3A5070", marginBottom: 10 }}>
+          Registra aquí la próxima fecha de incremento y el monto acordado. Pasará a aprobación del Director.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
+          <div>{inp("Fecha de incremento", "fecha_incremento", "date")}</div>
+          <div>{inp("Renta nueva ($)", "renta_nueva", "number", "Ej. 95000")}</div>
+        </div>
+        <div>{inp("Motivo / Notas del incremento", "notas_incremento", "text", "Ej. Incremento anual acordado")}</div>
+      </div>
+
       <div style={{ marginBottom: 16 }}>
-        <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Notas</label>
+        <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Notas generales</label>
         <textarea value={form.notas || ""} onChange={e => set("notas", e.target.value)} rows={2} placeholder="Observaciones, condiciones especiales..."
           style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
       </div>
@@ -121,6 +132,74 @@ function FormInquilino({ inicial, naves, onGuardar, onCancelar }) {
   );
 }
 
+function ModalIncrementoDirecto({ inq, naves, onClose, onGuardar }) {
+  const nave = naves.find(n => n.id === inq.nave_id);
+  const [form, setForm] = useState({
+    fecha_incremento: "",
+    renta_actual: nave?.renta || 0,
+    renta_nueva: "",
+    notas_incremento: "",
+  });
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#000000CC", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: "#0F1520", borderRadius: 16, border: "1px solid #1E2740", width: "100%", maxWidth: 440 }}>
+        <div style={{ padding: "20px 24px", borderBottom: "1px solid #1E2740", display: "flex", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#E8EDF5" }}>📈 Registrar incremento</div>
+            <div style={{ fontSize: 12, color: "#4E6080", marginTop: 2 }}>{inq.alias}</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#4E6080", cursor: "pointer", fontSize: 20 }}>✕</button>
+        </div>
+        <div style={{ padding: "20px 24px" }}>
+          <div style={{ background: "#0A0E17", borderRadius: 10, padding: "12px 14px", border: "1px solid #1E2740", marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: "#3A5070", marginBottom: 4 }}>Renta actual</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "#00C896" }}>${Number(form.renta_actual).toLocaleString()}/mes</div>
+            {nave && <div style={{ fontSize: 11, color: "#3A5070", marginTop: 2 }}>{nave.nombre} · {nave.m2} m²</div>}
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Fecha del incremento *</label>
+            <input value={form.fecha_incremento} onChange={e => set("fecha_incremento", e.target.value)} type="date"
+              style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box" }} />
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Renta nueva ($) *</label>
+            <input value={form.renta_nueva} onChange={e => set("renta_nueva", e.target.value)} type="number" placeholder="Ej. 95000"
+              style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box" }} />
+            {form.renta_nueva && Number(form.renta_nueva) > 0 && (
+              <div style={{ fontSize: 12, color: "#FFB547", marginTop: 4 }}>
+                Incremento: ${(Number(form.renta_nueva) - Number(form.renta_actual)).toLocaleString()} 
+                ({(((Number(form.renta_nueva) - Number(form.renta_actual)) / Number(form.renta_actual)) * 100).toFixed(1)}%)
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Motivo / Notas</label>
+            <input value={form.notas_incremento} onChange={e => set("notas_incremento", e.target.value)} placeholder="Ej. Incremento anual acordado"
+              style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box" }} />
+          </div>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={onClose} style={{ flex: 1, background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#4E6080", padding: 11, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
+            <button onClick={() => {
+              if (!form.fecha_incremento || !form.renta_nueva) return alert("Fecha y renta nueva son obligatorios");
+              onGuardar({ ...form, renta_actual: Number(form.renta_actual), renta_nueva: Number(form.renta_nueva) });
+              onClose();
+            }} style={{ flex: 2, background: "linear-gradient(135deg, #FFB547, #FF8C5C)", border: "none", borderRadius: 8, color: "#fff", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+              Enviar a aprobación
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Inquilinos({ rol, usuarioEmail }) {
   const [inquilinos, setInquilinos] = useState([]);
   const [naves, setNaves] = useState([]);
@@ -128,6 +207,7 @@ export default function Inquilinos({ rol, usuarioEmail }) {
   const [editando, setEditando] = useState(null);
   const [confirmBorrar, setConfirmBorrar] = useState(null);
   const [busqueda, setBusqueda] = useState("");
+  const [modalIncremento, setModalIncremento] = useState(null);
 
   useEffect(() => {
     const unsubInq = onSnapshot(collection(db, "inquilinos"), snap => {
@@ -180,6 +260,28 @@ export default function Inquilinos({ rol, usuarioEmail }) {
     setConfirmBorrar(null);
   };
 
+  const registrarIncremento = async (inq, data) => {
+    await addDoc(collection(db, "pendientes"), {
+      tipo_movimiento: "incremento",
+      inquilino_id: inq.id,
+      inquilino_alias: inq.alias,
+      nave_id: inq.nave_id,
+      inmueble_id: inq.inmueble_id,
+      renta_actual: data.renta_actual,
+      renta_nueva: data.renta_nueva,
+      fecha_incremento: data.fecha_incremento,
+      notas_incremento: data.notas_incremento || "",
+      fecha_captura: new Date().toISOString(),
+      capturado_por: usuarioEmail,
+    });
+    await registrarAuditoria({
+      tipo: "alta", modulo: "incrementos",
+      descripcion: `Incremento enviado a aprobación: ${inq.alias} — $${Number(data.renta_actual).toLocaleString()} → $${Number(data.renta_nueva).toLocaleString()}`,
+      detalle: { renta_actual: data.renta_actual, renta_nueva: data.renta_nueva, fecha: data.fecha_incremento },
+    });
+    alert("Incremento enviado a aprobaciones ✅");
+  };
+
   const getNave = (nave_id) => naves.find(n => n.id === nave_id);
   const getInmueble = (inmueble_id) => inmuebles.find(i => String(i.id) === String(inmueble_id));
 
@@ -195,6 +297,11 @@ export default function Inquilinos({ rol, usuarioEmail }) {
   const vencidos = inquilinos.filter(inq => {
     const dias = diasRestantes(inq.fecha_fin);
     return dias !== null && dias < 0;
+  });
+
+  const incrementosPronto = inquilinos.filter(inq => {
+    const dias = diasRestantes(inq.fecha_incremento);
+    return dias !== null && dias <= 60 && dias >= 0;
   });
 
   return (
@@ -218,6 +325,14 @@ export default function Inquilinos({ rol, usuarioEmail }) {
           </div>
         </Modal>
       )}
+      {modalIncremento && (
+        <ModalIncrementoDirecto
+          inq={modalIncremento}
+          naves={naves}
+          onClose={() => setModalIncremento(null)}
+          onGuardar={(data) => registrarIncremento(modalIncremento, data)}
+        />
+      )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
@@ -229,7 +344,8 @@ export default function Inquilinos({ rol, usuarioEmail }) {
         </button>
       </div>
 
-      {(vencidos.length > 0 || vencenPronto.length > 0) && (
+      {/* Alertas */}
+      {(vencidos.length > 0 || vencenPronto.length > 0 || incrementosPronto.length > 0) && (
         <div style={{ marginBottom: 20 }}>
           {vencidos.length > 0 && (
             <div style={{ background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 10, padding: "12px 16px", marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
@@ -238,9 +354,15 @@ export default function Inquilinos({ rol, usuarioEmail }) {
             </div>
           )}
           {vencenPronto.length > 0 && (
-            <div style={{ background: "#2A2000", border: "1px solid #FFB54733", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ background: "#2A2000", border: "1px solid #FFB54733", borderRadius: 10, padding: "12px 16px", marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: 18 }}>📋</span>
               <span style={{ fontSize: 13, color: "#FFB547", fontWeight: 600 }}>{vencenPronto.length} contrato{vencenPronto.length > 1 ? "s" : ""} por vencer: {vencenPronto.map(i => i.alias).join(", ")}</span>
+            </div>
+          )}
+          {incrementosPronto.length > 0 && (
+            <div style={{ background: "#0D1A2E", border: "1px solid #4E8CFF33", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 18 }}>📈</span>
+              <span style={{ fontSize: 13, color: "#4E8CFF", fontWeight: 600 }}>{incrementosPronto.length} incremento{incrementosPronto.length > 1 ? "s" : ""} próximo{incrementosPronto.length > 1 ? "s" : ""} (menos de 60 días): {incrementosPronto.map(i => i.alias).join(", ")}</span>
             </div>
           )}
         </div>
@@ -276,6 +398,7 @@ export default function Inquilinos({ rol, usuarioEmail }) {
             const inmueble = getInmueble(inq.inmueble_id);
             const dias = diasRestantes(inq.fecha_fin);
             const alerta = alertaContrato(dias);
+            const diasIncremento = diasRestantes(inq.fecha_incremento);
             return (
               <div key={inq.id} style={{ background: "#0F1520", borderRadius: 14, border: "1px solid #1E2740", overflow: "hidden" }}>
                 <div style={{ padding: "14px 18px", background: "#0A0E17", borderBottom: "1px solid #1E2740", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -289,6 +412,8 @@ export default function Inquilinos({ rol, usuarioEmail }) {
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => setModalIncremento(inq)}
+                      style={{ background: "#0D1A2E", border: "1px solid #4E8CFF33", borderRadius: 6, color: "#4E8CFF", padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>📈</button>
                     <button onClick={() => setEditando(inq)} style={{ background: "#1A2535", border: "1px solid #1E2740", borderRadius: 6, color: "#4E8CFF", padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>✏️</button>
                     <button onClick={() => setConfirmBorrar(inq)} style={{ background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 6, color: "#FF5C5C", padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>🗑️</button>
                   </div>
@@ -304,9 +429,20 @@ export default function Inquilinos({ rol, usuarioEmail }) {
                     </div>
                   )}
                   {alerta && (
-                    <div style={{ background: alerta.bg, borderRadius: 8, padding: "7px 12px", border: `1px solid ${alerta.color}33`, marginBottom: 10 }}>
+                    <div style={{ background: alerta.bg, borderRadius: 8, padding: "7px 12px", border: `1px solid ${alerta.color}33`, marginBottom: 8 }}>
                       <div style={{ fontSize: 11, color: alerta.color, fontWeight: 600 }}>📋 Contrato: {alerta.label}</div>
                       {inq.fecha_fin && <div style={{ fontSize: 11, color: "#3A5070", marginTop: 2 }}>Vence: {inq.fecha_fin}</div>}
+                    </div>
+                  )}
+                  {inq.fecha_incremento && (
+                    <div style={{ background: diasIncremento !== null && diasIncremento <= 60 ? "#0D1A2E" : "#0A0E17", borderRadius: 8, padding: "7px 12px", border: `1px solid ${diasIncremento !== null && diasIncremento <= 60 ? "#4E8CFF33" : "#1E2740"}`, marginBottom: 8 }}>
+                      <div style={{ fontSize: 11, color: diasIncremento !== null && diasIncremento <= 60 ? "#4E8CFF" : "#3A5070", fontWeight: 600 }}>
+                        📈 Incremento: {inq.fecha_incremento}
+                        {inq.renta_nueva && <span style={{ color: "#00C896", marginLeft: 6 }}>${Number(inq.renta_nueva).toLocaleString()}</span>}
+                      </div>
+                      {diasIncremento !== null && diasIncremento <= 60 && (
+                        <div style={{ fontSize: 11, color: "#4E8CFF", marginTop: 2 }}>En {diasIncremento} días</div>
+                      )}
                     </div>
                   )}
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
