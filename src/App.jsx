@@ -42,12 +42,12 @@ const navItems = [
 
 const TIPO_ICONS = {
   propietario: "🏢", inmueble: "🏭", nave: "🏗️",
-  inquilino: "👥", pago: "💰", gasto: "📋",
+  inquilino: "👥", pago: "💰", gasto: "📋", incremento: "📈",
 };
 
 const TIPO_LABELS = {
   propietario: "Propietario", inmueble: "Inmueble", nave: "Nave",
-  inquilino: "Inquilino", pago: "Pago", gasto: "Gasto",
+  inquilino: "Inquilino", pago: "Pago", gasto: "Gasto", incremento: "Incremento",
 };
 
 function usePagos() {
@@ -89,19 +89,17 @@ function ModalEditarCaptura({ item, onClose, onGuardar }) {
             {["Transferencia","Efectivo","Cheque","Deposito","Otro"].map(m => <option key={m}>{m}</option>)}
           </select>
         </div>
-        {inp("Notas", "notas", "text", "Referencia, observaciones...")}
+        {inp("Notas", "notas", "text")}
       </>
     );
-
     if (item.tipo_movimiento === "gasto") return (
       <>
         <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 600, marginBottom: 10 }}>GASTO</div>
-        {inp("Concepto *", "concepto", "text", "Ej. Mantenimiento")}
+        {inp("Concepto *", "concepto", "text")}
         {inp("Monto ($) *", "monto", "number")}
         {inp("Fecha", "fecha", "date")}
       </>
     );
-
     if (item.tipo_movimiento === "inquilino") return (
       <>
         <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 600, marginBottom: 10 }}>INQUILINO</div>
@@ -116,26 +114,31 @@ function ModalEditarCaptura({ item, onClose, onGuardar }) {
         {inp("Notas", "notas", "text")}
       </>
     );
-
     if (item.tipo_movimiento === "propietario") return (
       <>
         <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 600, marginBottom: 10 }}>PROPIETARIO</div>
         {inp("Nombre *", "nombre", "text")}
       </>
     );
-
     if (item.tipo_movimiento === "inmueble") return (
       <>
         <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 600, marginBottom: 10 }}>INMUEBLE</div>
         {inp("Nombre *", "nombre", "text")}
       </>
     );
-
     if (item.tipo_movimiento === "nave") return (
       <>
         <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 600, marginBottom: 10 }}>NAVE</div>
         {inp("Nombre *", "nombre", "text")}
         {inp("Metros cuadrados", "m2", "number")}
+      </>
+    );
+    if (item.tipo_movimiento === "incremento") return (
+      <>
+        <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 600, marginBottom: 10 }}>INCREMENTO — {item.inquilino_alias}</div>
+        {inp("Fecha de incremento", "fecha_incremento", "date")}
+        {inp("Renta nueva ($)", "renta_nueva", "number")}
+        {inp("Notas", "notas_incremento", "text")}
       </>
     );
   };
@@ -192,6 +195,7 @@ function MisCapturas({ usuarioEmail, onClose }) {
     if (item.tipo_movimiento === "pago") return `${item.empresa} — ${item.mes}`;
     if (item.tipo_movimiento === "gasto") return item.concepto;
     if (item.tipo_movimiento === "inquilino") return item.alias;
+    if (item.tipo_movimiento === "incremento") return item.inquilino_alias;
     return item.nombre;
   };
 
@@ -226,6 +230,13 @@ function MisCapturas({ usuarioEmail, onClose }) {
       if (item.contacto) rows.push(["Contacto", item.contacto]);
       if (item.fecha_inicio) rows.push(["Inicio contrato", formatFecha(item.fecha_inicio)]);
       if (item.fecha_fin) rows.push(["Fin contrato", formatFecha(item.fecha_fin)]);
+    } else if (item.tipo_movimiento === "incremento") {
+      rows.push(["Inquilino", item.inquilino_alias]);
+      rows.push(["Renta actual", fmt(item.renta_actual)]);
+      rows.push(["Renta nueva", fmt(item.renta_nueva)]);
+      rows.push(["Diferencia", `+${fmt(Number(item.renta_nueva) - Number(item.renta_actual))}`]);
+      rows.push(["Fecha incremento", formatFecha(item.fecha_incremento)]);
+      if (item.notas_incremento) rows.push(["Notas", item.notas_incremento]);
     } else if (item.tipo_movimiento === "propietario") {
       rows.push(["Nombre", item.nombre]);
       rows.push(["Cuentas bancarias", `${item.cuentas?.length || 0} cuenta(s)`]);
@@ -242,14 +253,7 @@ function MisCapturas({ usuarioEmail, onClose }) {
   return (
     <>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "#000000AA", zIndex: 300 }} />
-
-      {editando && (
-        <ModalEditarCaptura
-          item={editando}
-          onClose={() => setEditando(null)}
-          onGuardar={guardarEdicion}
-        />
-      )}
+      {editando && <ModalEditarCaptura item={editando} onClose={() => setEditando(null)} onGuardar={guardarEdicion} />}
 
       <div style={{ position: "fixed", top: 0, right: 0, width: 420, height: "100vh", background: "#0F1520", borderLeft: "1px solid #1E2740", zIndex: 301, display: "flex", flexDirection: "column" }}>
         <div style={{ padding: "20px 24px", borderBottom: "1px solid #1E2740", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -288,8 +292,6 @@ function MisCapturas({ usuarioEmail, onClose }) {
                     Pendiente
                   </span>
                 </div>
-
-                {/* Detalle completo */}
                 <div style={{ background: "#141A28", borderRadius: 8, padding: "10px 12px", marginBottom: 10 }}>
                   {renderDetalle(item).map(([label, value], i) => (
                     <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: i < renderDetalle(item).length - 1 ? "1px solid #1E2740" : "none" }}>
@@ -298,7 +300,6 @@ function MisCapturas({ usuarioEmail, onClose }) {
                     </div>
                   ))}
                 </div>
-
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={() => setEditando(item)}
                     style={{ flex: 1, background: "#0D1A2E", border: "1px solid #4E8CFF33", borderRadius: 6, color: "#4E8CFF", padding: "7px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
@@ -339,8 +340,7 @@ export default function App() {
   const [active, setActive] = useState(null);
   const [naves, setNaves] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [migrando, setMigrando] = useState(false);
-  const [migrandoInmuebles, setMigrandoInmuebles] = useState(false);
+  const [migrandoInquilinos, setMigrandoInquilinos] = useState(false);
   const [mostrarMisCapturas, setMostrarMisCapturas] = useState(false);
   const [totalPendientes, setTotalPendientes] = useState(0);
   const pagos = usePagos();
@@ -392,52 +392,37 @@ export default function App() {
     inicializar();
   }, [usuario]);
 
-  const navesConIdNumerico = naves.filter(n => typeof n.inmueble_id === "number");
-
-  const migrarInmuebles = async () => {
-    setMigrandoInmuebles(true);
+  // Migrar inmueble_id de inquilinos de número a string
+  const migrarInmuebleIdInquilinos = async () => {
+    setMigrandoInquilinos(true);
+    const mapa = { 1: "inm1", 2: "inm2", 3: "inm3", 4: "inm4" };
     try {
-      const mapa = { 1: "inm1", 2: "inm2", 3: "inm3", 4: "inm4" };
-      const snap = await getDocs(collection(db, "naves"));
-      let actualizadas = 0;
+      const snap = await getDocs(collection(db, "inquilinos"));
+      let actualizados = 0;
       for (const d of snap.docs) {
-        const nave = d.data();
-        if (typeof nave.inmueble_id === "number" && mapa[nave.inmueble_id]) {
-          await updateDoc(doc(db, "naves", d.id), { inmueble_id: mapa[nave.inmueble_id] });
-          actualizadas++;
+        const inq = d.data();
+        if (typeof inq.inmueble_id === "number" && mapa[inq.inmueble_id]) {
+          await updateDoc(doc(db, "inquilinos", d.id), { inmueble_id: mapa[inq.inmueble_id] });
+          actualizados++;
         }
       }
-      const snap2 = await getDocs(collection(db, "naves"));
-      setNaves(snap2.docs.map(d => ({ id: d.id, ...d.data() })));
-      alert(`${actualizadas} naves migradas.`);
-    } catch (e) { alert("Error en la migracion."); }
-    setMigrandoInmuebles(false);
+      alert(`${actualizados} inquilinos migrados correctamente ✅`);
+    } catch (e) {
+      alert("Error en la migración.");
+    }
+    setMigrandoInquilinos(false);
   };
 
-  const migrarInquilinos = async () => {
-    setMigrando(true);
-    try {
-      const navesSnap = await getDocs(collection(db, "naves"));
-      const todasNaves = navesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const navesConInquilino = todasNaves.filter(n => n.inquilino && n.inquilino.trim() !== "");
-      const inquilinosSnap = await getDocs(collection(db, "inquilinos"));
-      const aliasExistentes = inquilinosSnap.docs.map(d => d.data().alias?.toLowerCase());
-      let creados = 0;
-      for (const nave of navesConInquilino) {
-        const alias = nave.inquilino.trim();
-        if (aliasExistentes.includes(alias.toLowerCase())) continue;
-        await addDoc(collection(db, "inquilinos"), {
-          alias, razon_social: "", rfc: "", contacto: "", telefono: "", correo: "",
-          nave_id: nave.id, inmueble_id: nave.inmueble_id,
-          fecha_inicio: "", fecha_fin: "", notas: "Migrado automaticamente",
-        });
-        creados++;
-      }
-      alert(`${creados} inquilinos creados.`);
-      setActive("inquilinos");
-    } catch (e) { alert("Error en la migracion."); }
-    setMigrando(false);
-  };
+  // Verificar si hay inquilinos con inmueble_id numérico
+  const [hayInquilinosSinMigrar, setHayInquilinosSinMigrar] = useState(false);
+  useEffect(() => {
+    if (!usuario) return;
+    const unsub = onSnapshot(collection(db, "inquilinos"), snap => {
+      const sinMigrar = snap.docs.some(d => typeof d.data().inmueble_id === "number");
+      setHayInquilinosSinMigrar(sinMigrar);
+    });
+    return () => unsub();
+  }, [usuario]);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -499,19 +484,12 @@ export default function App() {
               </button>
             ))}
 
-          {navesConIdNumerico.length > 0 && (
-            <button onClick={migrarInmuebles} disabled={migrandoInmuebles}
-              style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 8, border: "1px dashed #FFB54744", cursor: migrandoInmuebles ? "default" : "pointer", textAlign: "left", width: "100%", background: "#2A2000", color: "#FFB547", fontSize: 12, fontWeight: 600, marginTop: 8 }}>
+          {/* Botón temporal migración — solo aparece si hay inquilinos sin migrar */}
+          {hayInquilinosSinMigrar && esDirector && (
+            <button onClick={migrarInmuebleIdInquilinos} disabled={migrandoInquilinos}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 8, border: "1px dashed #FFB54744", cursor: migrandoInquilinos ? "default" : "pointer", textAlign: "left", width: "100%", background: "#2A2000", color: "#FFB547", fontSize: 12, fontWeight: 600, marginTop: 8 }}>
               <span style={{ fontSize: 14 }}>🔄</span>
-              {migrandoInmuebles ? "Migrando..." : "Migrar naves"}
-            </button>
-          )}
-
-          {naves.some(n => n.inquilino && n.inquilino.trim() !== "") && (
-            <button onClick={migrarInquilinos} disabled={migrando}
-              style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 8, border: "1px dashed #FFB54744", cursor: migrando ? "default" : "pointer", textAlign: "left", width: "100%", background: "#2A2000", color: "#FFB547", fontSize: 12, fontWeight: 600, marginTop: 4 }}>
-              <span style={{ fontSize: 14 }}>🔄</span>
-              {migrando ? "Migrando..." : "Migrar inquilinos"}
+              {migrandoInquilinos ? "Migrando..." : "Migrar inquilinos"}
             </button>
           )}
         </nav>
