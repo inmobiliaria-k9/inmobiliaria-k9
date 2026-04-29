@@ -44,8 +44,9 @@ function FormInquilino({ inicial, naves, onGuardar, onCancelar }) {
   const [form, setForm] = useState(inicial || empty);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  // FIX — comparar como strings para evitar problemas de tipo
   const navesFiltradas = form.inmueble_id
-    ? naves.filter(n => n.inmueble_id === Number(form.inmueble_id) || n.inmueble_id === form.inmueble_id)
+    ? naves.filter(n => String(n.inmueble_id) === String(form.inmueble_id))
     : naves;
 
   const diasRestantesContrato = diasRestantes(form.fecha_fin);
@@ -180,7 +181,7 @@ export default function Inquilinos({ rol, usuarioEmail }) {
   };
 
   const getNave = (nave_id) => naves.find(n => n.id === nave_id);
-  const getInmueble = (inmueble_id) => inmuebles.find(i => i.id === Number(inmueble_id) || i.id === inmueble_id);
+  const getInmueble = (inmueble_id) => inmuebles.find(i => String(i.id) === String(inmueble_id));
 
   const filtrados = inquilinos.filter(inq =>
     `${inq.alias} ${inq.razon_social} ${inq.contacto} ${inq.rfc}`.toLowerCase().includes(busqueda.toLowerCase())
