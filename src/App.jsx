@@ -370,26 +370,20 @@ export default function App() {
     return () => unsub();
   }, [usuario]);
 
-  useEffect(() => {
+ useEffect(() => {
     if (!usuario) return;
-    const inicializar = async () => {
-      try {
-        const snap = await getDocs(collection(db, "naves"));
-        if (snap.empty) {
-          for (const nave of navesIniciales) {
-            await setDoc(doc(db, "naves", nave.id), nave);
-          }
-          setNaves(navesIniciales);
-        } else {
-          setNaves(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const unsub = onSnapshot(collection(db, "naves"), async (snap) => {
+      if (snap.empty) {
+        for (const nave of navesIniciales) {
+          await setDoc(doc(db, "naves", nave.id), nave);
         }
-      } catch (e) {
-        console.error(e);
         setNaves(navesIniciales);
+      } else {
+        setNaves(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       }
       setCargando(false);
-    };
-    inicializar();
+    });
+    return () => unsub();
   }, [usuario]);
 
   // Migrar inmueble_id de inquilinos de número a string
