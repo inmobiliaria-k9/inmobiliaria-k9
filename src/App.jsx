@@ -40,22 +40,14 @@ const navItems = [
   { id: "resumen",      label: "Resumen Anual",      icon: "📊", soloDirector: false },
 ];
 
-const TIPO_LABELS = {
-  propietario: "Propietario",
-  inmueble: "Inmueble",
-  nave: "Nave",
-  inquilino: "Inquilino",
-  pago: "Pago",
-  gasto: "Gasto",
+const TIPO_ICONS = {
+  propietario: "🏢", inmueble: "🏭", nave: "🏗️",
+  inquilino: "👥", pago: "💰", gasto: "📋",
 };
 
-const TIPO_ICONS = {
-  propietario: "🏢",
-  inmueble: "🏭",
-  nave: "🏗️",
-  inquilino: "👥",
-  pago: "💰",
-  gasto: "📋",
+const TIPO_LABELS = {
+  propietario: "Propietario", inmueble: "Inmueble", nave: "Nave",
+  inquilino: "Inquilino", pago: "Pago", gasto: "Gasto",
 };
 
 function usePagos() {
@@ -71,10 +63,109 @@ function usePagos() {
   return pagos;
 }
 
+// ─── MODAL EDITAR CAPTURA ─────────────────────────────────────────────────────
+function ModalEditarCaptura({ item, onClose, onGuardar }) {
+  const [form, setForm] = useState({ ...item });
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const inp = (label, key, type = "text", placeholder = "") => (
+    <div style={{ marginBottom: 12 }}>
+      <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>{label}</label>
+      <input value={form[key] || ""} onChange={e => set(key, e.target.value)} type={type} placeholder={placeholder}
+        style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box" }} />
+    </div>
+  );
+
+  const renderCampos = () => {
+    if (item.tipo_movimiento === "pago") return (
+      <>
+        <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 600, marginBottom: 10 }}>PAGO — {item.empresa} · {item.mes}</div>
+        {inp("Monto base ($)", "monto_base", "number")}
+        {inp("Fecha de pago", "fecha", "date")}
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: "block", fontSize: 12, color: "#4E6080", marginBottom: 5, fontWeight: 600 }}>Método</label>
+          <select value={form.metodo || "Transferencia"} onChange={e => set("metodo", e.target.value)}
+            style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none" }}>
+            {["Transferencia","Efectivo","Cheque","Deposito","Otro"].map(m => <option key={m}>{m}</option>)}
+          </select>
+        </div>
+        {inp("Notas", "notas", "text", "Referencia, observaciones...")}
+      </>
+    );
+
+    if (item.tipo_movimiento === "gasto") return (
+      <>
+        <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 600, marginBottom: 10 }}>GASTO</div>
+        {inp("Concepto *", "concepto", "text", "Ej. Mantenimiento")}
+        {inp("Monto ($) *", "monto", "number")}
+        {inp("Fecha", "fecha", "date")}
+      </>
+    );
+
+    if (item.tipo_movimiento === "inquilino") return (
+      <>
+        <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 600, marginBottom: 10 }}>INQUILINO</div>
+        {inp("Alias *", "alias", "text")}
+        {inp("Razón social", "razon_social", "text")}
+        {inp("RFC", "rfc", "text")}
+        {inp("Contacto", "contacto", "text")}
+        {inp("Teléfono", "telefono", "tel")}
+        {inp("Correo", "correo", "email")}
+        {inp("Fecha inicio contrato", "fecha_inicio", "date")}
+        {inp("Fecha fin contrato", "fecha_fin", "date")}
+        {inp("Notas", "notas", "text")}
+      </>
+    );
+
+    if (item.tipo_movimiento === "propietario") return (
+      <>
+        <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 600, marginBottom: 10 }}>PROPIETARIO</div>
+        {inp("Nombre *", "nombre", "text")}
+      </>
+    );
+
+    if (item.tipo_movimiento === "inmueble") return (
+      <>
+        <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 600, marginBottom: 10 }}>INMUEBLE</div>
+        {inp("Nombre *", "nombre", "text")}
+      </>
+    );
+
+    if (item.tipo_movimiento === "nave") return (
+      <>
+        <div style={{ fontSize: 12, color: "#4E6080", fontWeight: 600, marginBottom: 10 }}>NAVE</div>
+        {inp("Nombre *", "nombre", "text")}
+        {inp("Metros cuadrados", "m2", "number")}
+      </>
+    );
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#000000CC", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ background: "#0F1520", borderRadius: 16, border: "1px solid #1E2740", width: "100%", maxWidth: 440, maxHeight: "90vh", overflow: "auto" }}>
+        <div style={{ padding: "20px 24px", borderBottom: "1px solid #1E2740", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#E8EDF5" }}>
+            {TIPO_ICONS[item.tipo_movimiento]} Editar {TIPO_LABELS[item.tipo_movimiento]}
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#4E6080", cursor: "pointer", fontSize: 20 }}>✕</button>
+        </div>
+        <div style={{ padding: "20px 24px" }}>
+          {renderCampos()}
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <button onClick={onClose} style={{ flex: 1, background: "#1A2535", border: "1px solid #1E2740", borderRadius: 8, color: "#4E6080", padding: 11, fontSize: 13, cursor: "pointer" }}>Cancelar</button>
+            <button onClick={() => onGuardar(form)} style={{ flex: 2, background: "linear-gradient(135deg, #00C896, #4E8CFF)", border: "none", borderRadius: 8, color: "#fff", padding: 11, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Guardar cambios</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── PANEL MIS CAPTURAS ───────────────────────────────────────────────────────
 function MisCapturas({ usuarioEmail, onClose }) {
   const [pendientes, setPendientes] = useState([]);
   const [confirmBorrar, setConfirmBorrar] = useState(null);
+  const [editando, setEditando] = useState(null);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "pendientes"), snap => {
@@ -92,6 +183,11 @@ function MisCapturas({ usuarioEmail, onClose }) {
     setConfirmBorrar(null);
   };
 
+  const guardarEdicion = async (form) => {
+    await updateDoc(doc(db, "pendientes", form.id), form);
+    setEditando(null);
+  };
+
   const getNombre = (item) => {
     if (item.tipo_movimiento === "pago") return `${item.empresa} — ${item.mes}`;
     if (item.tipo_movimiento === "gasto") return item.concepto;
@@ -101,20 +197,61 @@ function MisCapturas({ usuarioEmail, onClose }) {
 
   const formatFecha = (fecha) => {
     if (!fecha) return "-";
-    const [y, m, d] = fecha.split("T")[0].split("-");
+    const f = fecha.includes("T") ? fecha.split("T")[0] : fecha;
+    const [y, m, d] = f.split("-");
     const meses = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
     return `${d} ${meses[parseInt(m) - 1]} ${y}`;
   };
 
+  const fmt = n => `$${Math.round(Number(n) || 0).toLocaleString()}`;
+
+  const renderDetalle = (item) => {
+    const rows = [];
+    if (item.tipo_movimiento === "pago") {
+      rows.push(["Periodo", item.mes]);
+      rows.push(["Monto base", fmt(item.monto_base)]);
+      rows.push(["Entra a cuenta", fmt(item.monto)]);
+      rows.push(["Método", item.metodo || "-"]);
+      rows.push(["Cuenta", item.cuenta_nombre || "-"]);
+      if (item.notas) rows.push(["Notas", item.notas]);
+    } else if (item.tipo_movimiento === "gasto") {
+      rows.push(["Concepto", item.concepto]);
+      rows.push(["Monto", fmt(item.monto)]);
+      rows.push(["Fecha", formatFecha(item.fecha)]);
+      rows.push(["Cuenta", item.cuenta_nombre || "-"]);
+    } else if (item.tipo_movimiento === "inquilino") {
+      rows.push(["Alias", item.alias]);
+      if (item.razon_social) rows.push(["Razón social", item.razon_social]);
+      if (item.rfc) rows.push(["RFC", item.rfc]);
+      if (item.contacto) rows.push(["Contacto", item.contacto]);
+      if (item.fecha_inicio) rows.push(["Inicio contrato", formatFecha(item.fecha_inicio)]);
+      if (item.fecha_fin) rows.push(["Fin contrato", formatFecha(item.fecha_fin)]);
+    } else if (item.tipo_movimiento === "propietario") {
+      rows.push(["Nombre", item.nombre]);
+      rows.push(["Cuentas bancarias", `${item.cuentas?.length || 0} cuenta(s)`]);
+      rows.push(["Inmuebles", `${item.inmuebles_ids?.length || 0} inmueble(s)`]);
+    } else if (item.tipo_movimiento === "inmueble") {
+      rows.push(["Nombre", item.nombre]);
+    } else if (item.tipo_movimiento === "nave") {
+      rows.push(["Nombre", item.nombre]);
+      rows.push(["Metros cuadrados", `${Number(item.m2 || 0).toLocaleString()} m²`]);
+    }
+    return rows;
+  };
+
   return (
     <>
-      {/* Overlay */}
       <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "#000000AA", zIndex: 300 }} />
 
-      {/* Panel */}
-      <div style={{ position: "fixed", top: 0, right: 0, width: 420, height: "100vh", background: "#0F1520", borderLeft: "1px solid #1E2740", zIndex: 301, display: "flex", flexDirection: "column" }}>
+      {editando && (
+        <ModalEditarCaptura
+          item={editando}
+          onClose={() => setEditando(null)}
+          onGuardar={guardarEdicion}
+        />
+      )}
 
-        {/* Header */}
+      <div style={{ position: "fixed", top: 0, right: 0, width: 420, height: "100vh", background: "#0F1520", borderLeft: "1px solid #1E2740", zIndex: 301, display: "flex", flexDirection: "column" }}>
         <div style={{ padding: "20px 24px", borderBottom: "1px solid #1E2740", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 700, color: "#E8EDF5" }}>Mis capturas</div>
@@ -127,7 +264,6 @@ function MisCapturas({ usuarioEmail, onClose }) {
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#4E6080", cursor: "pointer", fontSize: 22 }}>✕</button>
         </div>
 
-        {/* Contenido */}
         <div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
           {pendientes.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 20px", color: "#3A5070" }}>
@@ -137,8 +273,8 @@ function MisCapturas({ usuarioEmail, onClose }) {
             </div>
           ) : (
             pendientes.map(item => (
-              <div key={item.id} style={{ background: "#0A0E17", borderRadius: 12, border: "1px solid #1E2740", padding: "14px 16px", marginBottom: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div key={item.id} style={{ background: "#0A0E17", borderRadius: 12, border: "1px solid #1E2740", padding: "14px 16px", marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <span style={{ fontSize: 22 }}>{TIPO_ICONS[item.tipo_movimiento]}</span>
                     <div>
@@ -153,20 +289,23 @@ function MisCapturas({ usuarioEmail, onClose }) {
                   </span>
                 </div>
 
-                {item.tipo_movimiento === "pago" && (
-                  <div style={{ marginTop: 8, fontSize: 12, color: "#4E6080" }}>
-                    Monto: <span style={{ color: "#00C896", fontWeight: 600 }}>${Number(item.monto_base || 0).toLocaleString()}</span>
-                  </div>
-                )}
-                {item.tipo_movimiento === "gasto" && (
-                  <div style={{ marginTop: 8, fontSize: 12, color: "#4E6080" }}>
-                    Monto: <span style={{ color: "#FF5C5C", fontWeight: 600 }}>${Number(item.monto || 0).toLocaleString()}</span>
-                  </div>
-                )}
+                {/* Detalle completo */}
+                <div style={{ background: "#141A28", borderRadius: 8, padding: "10px 12px", marginBottom: 10 }}>
+                  {renderDetalle(item).map(([label, value], i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: i < renderDetalle(item).length - 1 ? "1px solid #1E2740" : "none" }}>
+                      <span style={{ fontSize: 12, color: "#4E6080" }}>{label}</span>
+                      <span style={{ fontSize: 12, color: "#C8D8F0", fontWeight: 600, maxWidth: 200, textAlign: "right" }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
 
-                <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => setEditando(item)}
+                    style={{ flex: 1, background: "#0D1A2E", border: "1px solid #4E8CFF33", borderRadius: 6, color: "#4E8CFF", padding: "7px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    Editar
+                  </button>
                   <button onClick={() => setConfirmBorrar(item)}
-                    style={{ background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 6, color: "#FF5C5C", padding: "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    style={{ flex: 1, background: "#2E0D0D", border: "1px solid #FF5C5C33", borderRadius: 6, color: "#FF5C5C", padding: "7px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                     Borrar
                   </button>
                 </div>
@@ -176,7 +315,6 @@ function MisCapturas({ usuarioEmail, onClose }) {
         </div>
       </div>
 
-      {/* Confirm borrar */}
       {confirmBorrar && (
         <div style={{ position: "fixed", inset: 0, background: "#000000CC", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
           <div style={{ background: "#0F1520", borderRadius: 16, border: "1px solid #1E2740", width: "100%", maxWidth: 380, padding: 28 }}>
@@ -221,7 +359,6 @@ export default function App() {
     setActive(rol === "director" ? "dashboard" : "propietarios");
   }, [usuario]);
 
-  // Contar pendientes del administrador
   useEffect(() => {
     if (!usuario) return;
     const rol = getRol(usuario.email);
@@ -338,7 +475,6 @@ export default function App() {
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#0A0E17", fontFamily: "'DM Sans','Segoe UI',sans-serif", color: "#E8EDF5" }}>
 
-      {/* Panel Mis Capturas */}
       {mostrarMisCapturas && !esDirector && (
         <MisCapturas usuarioEmail={usuario.email} onClose={() => setMostrarMisCapturas(false)} />
       )}
@@ -381,8 +517,6 @@ export default function App() {
         </nav>
 
         <div style={{ padding: "16px", borderTop: "1px solid #1E2740" }}>
-
-          {/* Botón Mis Capturas — solo para administrador */}
           {!esDirector && (
             <button onClick={() => setMostrarMisCapturas(true)}
               style={{ width: "100%", background: totalPendientes > 0 ? "#2A2000" : "#0F1520", border: `1px solid ${totalPendientes > 0 ? "#FFB54744" : "#1E2740"}`, borderRadius: 8, color: totalPendientes > 0 ? "#FFB547" : "#4E6080", padding: "8px 12px", fontSize: 12, cursor: "pointer", fontWeight: 600, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
