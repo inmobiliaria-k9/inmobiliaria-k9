@@ -172,7 +172,7 @@ function ModalIncrementoDirecto({ inq, naves, onClose, onGuardar }) {
               style={{ width: "100%", background: "#0A0E17", border: "1px solid #1E2740", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#E8EDF5", outline: "none", boxSizing: "border-box" }} />
             {form.renta_nueva && Number(form.renta_nueva) > 0 && (
               <div style={{ fontSize: 12, color: "#FFB547", marginTop: 4 }}>
-                Incremento: ${(Number(form.renta_nueva) - Number(form.renta_actual)).toLocaleString()} 
+                Incremento: ${(Number(form.renta_nueva) - Number(form.renta_actual)).toLocaleString()}
                 ({(((Number(form.renta_nueva) - Number(form.renta_actual)) / Number(form.renta_actual)) * 100).toFixed(1)}%)
               </div>
             )}
@@ -344,7 +344,6 @@ export default function Inquilinos({ rol, usuarioEmail }) {
         </button>
       </div>
 
-      {/* Alertas */}
       {(vencidos.length > 0 || vencenPronto.length > 0 || incrementosPronto.length > 0) && (
         <div style={{ marginBottom: 20 }}>
           {vencidos.length > 0 && (
@@ -435,13 +434,17 @@ export default function Inquilinos({ rol, usuarioEmail }) {
                     </div>
                   )}
                   {inq.fecha_incremento && (
-                    <div style={{ background: diasIncremento !== null && diasIncremento <= 60 ? "#0D1A2E" : "#0A0E17", borderRadius: 8, padding: "7px 12px", border: `1px solid ${diasIncremento !== null && diasIncremento <= 60 ? "#4E8CFF33" : "#1E2740"}`, marginBottom: 8 }}>
-                      <div style={{ fontSize: 11, color: diasIncremento !== null && diasIncremento <= 60 ? "#4E8CFF" : "#3A5070", fontWeight: 600 }}>
+                    <div style={{ background: diasIncremento !== null && diasIncremento <= 60 && diasIncremento >= 0 ? "#0D1A2E" : "#0A0E17", borderRadius: 8, padding: "7px 12px", border: `1px solid ${diasIncremento !== null && diasIncremento <= 60 && diasIncremento >= 0 ? "#4E8CFF33" : "#1E2740"}`, marginBottom: 8 }}>
+                      <div style={{ fontSize: 11, color: diasIncremento !== null && diasIncremento < 0 ? "#FF5C5C" : diasIncremento !== null && diasIncremento <= 60 ? "#4E8CFF" : "#3A5070", fontWeight: 600 }}>
                         📈 Incremento: {inq.fecha_incremento}
                         {inq.renta_nueva && <span style={{ color: "#00C896", marginLeft: 6 }}>${Number(inq.renta_nueva).toLocaleString()}</span>}
                       </div>
-                      {diasIncremento !== null && diasIncremento <= 60 && (
-                        <div style={{ fontSize: 11, color: "#4E8CFF", marginTop: 2 }}>En {diasIncremento} días</div>
+                      {diasIncremento !== null && (
+                        <div style={{ fontSize: 11, color: diasIncremento < 0 ? "#FF5C5C" : "#4E8CFF", marginTop: 2 }}>
+                          {diasIncremento < 0
+                            ? `Venció hace ${Math.abs(diasIncremento)} días`
+                            : `Faltan ${diasIncremento} días`}
+                        </div>
                       )}
                     </div>
                   )}
