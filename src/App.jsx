@@ -63,7 +63,6 @@ function usePagos() {
   return pagos;
 }
 
-// ─── MODAL EDITAR CAPTURA ─────────────────────────────────────────────────────
 function ModalEditarCaptura({ item, onClose, onGuardar }) {
   const [form, setForm] = useState({ ...item });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -164,7 +163,6 @@ function ModalEditarCaptura({ item, onClose, onGuardar }) {
   );
 }
 
-// ─── PANEL MIS CAPTURAS ───────────────────────────────────────────────────────
 function MisCapturas({ usuarioEmail, onClose }) {
   const [pendientes, setPendientes] = useState([]);
   const [confirmBorrar, setConfirmBorrar] = useState(null);
@@ -340,7 +338,6 @@ export default function App() {
   const [active, setActive] = useState(null);
   const [naves, setNaves] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [migrandoInquilinos, setMigrandoInquilinos] = useState(false);
   const [mostrarMisCapturas, setMostrarMisCapturas] = useState(false);
   const [totalPendientes, setTotalPendientes] = useState(0);
   const pagos = usePagos();
@@ -370,7 +367,7 @@ export default function App() {
     return () => unsub();
   }, [usuario]);
 
- useEffect(() => {
+  useEffect(() => {
     if (!usuario) return;
     const unsub = onSnapshot(collection(db, "naves"), async (snap) => {
       if (snap.empty) {
@@ -382,38 +379,6 @@ export default function App() {
         setNaves(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       }
       setCargando(false);
-    });
-    return () => unsub();
-  }, [usuario]);
-
-  // Migrar inmueble_id de inquilinos de número a string
-  const migrarInmuebleIdInquilinos = async () => {
-    setMigrandoInquilinos(true);
-    const mapa = { 1: "inm1", 2: "inm2", 3: "inm3", 4: "inm4" };
-    try {
-      const snap = await getDocs(collection(db, "inquilinos"));
-      let actualizados = 0;
-      for (const d of snap.docs) {
-        const inq = d.data();
-        if (typeof inq.inmueble_id === "number" && mapa[inq.inmueble_id]) {
-          await updateDoc(doc(db, "inquilinos", d.id), { inmueble_id: mapa[inq.inmueble_id] });
-          actualizados++;
-        }
-      }
-      alert(`${actualizados} inquilinos migrados correctamente ✅`);
-    } catch (e) {
-      alert("Error en la migración.");
-    }
-    setMigrandoInquilinos(false);
-  };
-
-  // Verificar si hay inquilinos con inmueble_id numérico
-  const [hayInquilinosSinMigrar, setHayInquilinosSinMigrar] = useState(false);
-  useEffect(() => {
-    if (!usuario) return;
-    const unsub = onSnapshot(collection(db, "inquilinos"), snap => {
-      const sinMigrar = snap.docs.some(d => typeof d.data().inmueble_id === "number");
-      setHayInquilinosSinMigrar(sinMigrar);
     });
     return () => unsub();
   }, [usuario]);
@@ -477,15 +442,6 @@ export default function App() {
                 {item.label}
               </button>
             ))}
-
-          {/* Botón temporal migración — solo aparece si hay inquilinos sin migrar */}
-          {hayInquilinosSinMigrar && esDirector && (
-            <button onClick={migrarInmuebleIdInquilinos} disabled={migrandoInquilinos}
-              style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 8, border: "1px dashed #FFB54744", cursor: migrandoInquilinos ? "default" : "pointer", textAlign: "left", width: "100%", background: "#2A2000", color: "#FFB547", fontSize: 12, fontWeight: 600, marginTop: 8 }}>
-              <span style={{ fontSize: 14 }}>🔄</span>
-              {migrandoInquilinos ? "Migrando..." : "Migrar inquilinos"}
-            </button>
-          )}
         </nav>
 
         <div style={{ padding: "16px", borderTop: "1px solid #1E2740" }}>
